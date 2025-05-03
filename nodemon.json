@@ -1,0 +1,5 @@
+{
+    "watch": ["server.js"],
+    "ignore": ["logs.json"]
+}
+  
