@@ -1,0 +1,36 @@
+[
+  {
+    "timestamp": "2025-05-07T02:30:52.454Z",
+    "user_prompt": "I tried to build a CNN for image classification, but my model gives 98% accuracy on training and only 55% on validation. I used ReLU, dropout, and 3 convolutional layers, and my loss keeps going down.\nIs it a good idea to add more layers to fix the validation performance??",
+    "feedback": {
+      "understanding": "partial",
+      "summary": "Student recognized overfitting but incorrectly considered adding layers as a solution, missing key fixes like regularization and data augmentation."
+    },
+    "intent": "explanation_notion_ml, correction_student_input"
+  },
+  {
+    "timestamp": "2025-05-07T02:46:07.519Z",
+    "feedback": {
+      "understanding": "partial",
+      "summary": "Student recognized overfitting but considered adding layers as a solution, missing key fixes like regularization and data augmentation."
+    }
+  },
+  {
+    "timestamp": "2025-05-07T03:01:25.234Z",
+    "feedback": {}
+  },
+  {
+    "timestamp": "2025-05-07T03:09:59.275Z",
+    "feedback": {
+      "understanding": "partial",
+      "summary": "The student recognizes overfitting but incorrectly considers adding layers as a solution."
+    }
+  },
+  {
+    "timestamp": "2025-05-07T03:10:54.779Z",
+    "feedback": {
+      "understanding": "partial",
+      "summary": "Student seeks help for revision but does not specify weaknesses, requiring a generic response."
+    }
+  }
+]
