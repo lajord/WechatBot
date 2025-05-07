@@ -32,5 +32,30 @@
       "understanding": "partial",
       "summary": "Student seeks help for revision but does not specify weaknesses, requiring a generic response."
     }
+  },
+  {
+    "timestamp": "2025-05-07T03:16:43.704Z",
+    "feedback": {
+      "understanding": "poor",
+      "summary": "The student's request for a sports skill improvement plan is unrelated to the provided machine learning revision plan."
+    }
+  },
+  {
+    "timestamp": "2025-05-07T03:19:05.978Z",
+    "feedback": {}
+  },
+  {
+    "timestamp": "2025-05-07T03:19:52.190Z",
+    "feedback": {
+      "understanding": "poor",
+      "summary": "The student's request is too vague and lacks specific details about the sport or current skill level."
+    }
+  },
+  {
+    "timestamp": "2025-05-07T03:22:18.171Z",
+    "feedback": {
+      "understanding": "poor",
+      "summary": "The student misunderstood the AI's specialization, asking for sports training instead of machine learning."
+    }
   }
 ]

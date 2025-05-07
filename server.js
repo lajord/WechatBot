@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 
 
-
+// The folder logs is for save discution of user and chatbot -> memory
 const LOGS_DIR = './logs';
 if (!fs.existsSync(LOGS_DIR)) {
   fs.mkdirSync(LOGS_DIR);
@@ -25,6 +25,10 @@ const openai = new OpenAI({
   apiKey: 'sk-7e8eab473f97484c97dd0be91cb192f0'
 });
 
+//-------------------------------------------------------------------------------------------//
+
+
+//-------------------------------------------------------------------------------------------//
 
 // This function call DeepSeek's API, take in parameters a prompt and return a response
 async function ApiCallDeepseek(prompt) {
@@ -42,25 +46,37 @@ async function ApiCallDeepseek(prompt) {
   }
 }
 
+//-------------------------------------------------------------------------------------------//
+
+
+//-------------------------------------------------------------------------------------------//
+
 /*
 The purpose of this function is to detect what type of request the user made.
 By this way we can create a response more coherent with the user intention
 */
 async function buildFinalPrompt(userPrompt, userId)
  {
+
+  //First prompt to identify the nature of the user's request 
   const intentDetectionPrompt = `
-      Here is a user query: "${userPrompt}"
-
-      Identify the type(s) of request this query represents. You can select one or more labels from the following list:
-
-      - explanation_notion_ml
-      - correction_student_input
-      - exam_creation
-      - generate_study_plan
-      - other
-
-      Return only the labels, separated by commas. Do not add explanations.
-      `; 
+  Here is a user query: "${userPrompt}"
+  
+  Identify the type(s) of request this query represents. You can select one or more labels from the following list:
+  
+  - explanation_notion_ml
+  - correction_student_input
+  - exam_creation
+  - generate_study_plan
+  - other
+  
+  Rules:
+  - If the request is not related to machine learning, regardless of intent or content, return only: other.
+  - Do NOT combine "other" with any other labels. If it's not about machine learning, the answer must be strictly: other.
+  - Do not try to reinterpret general topics (math, programming, etc.) as ML if not explicitly linked.
+  
+  Return only the labels, separated by commas. Do not add explanations.
+  `;
   
   let intent;
   try {
@@ -270,7 +286,29 @@ l'énoncer de la question a laquelle il répond.
   ${userPrompt}
   """`;
   }else if (lowerIntent.includes("other")) {
-    finalPrompt = `Speak in English, You have to answer word by word and say nothing other than: I'm sorry I'm not created to answer this kind of question.`;
+    finalPrompt = `
+      Speak in English.
+
+      You are a polite and focused AI assistant designed to help students understand and practice **machine learning**.
+
+      If a user asks a question that is **not related to machine learning**, you must **refuse to answer**, without improvising or guessing.
+
+      Instead, clearly explain:
+      - That you are specialized in machine learning.
+      - That your role is to support students in four main ways:
+        1. Explaining ML concepts in a simple, clear way.
+        2. Analyzing and correcting code or answers related to ML.
+        3. Generating exam questions to help students practice.
+        4. Building personalized revision plans based on the student's weaknesses.
+
+      Be kind, but stay strict: do **not** answer off-topic questions.
+
+      Here is the user's message:
+      """
+      ${userPrompt}
+      """
+      `;
+
   
   
   }else {
@@ -281,8 +319,12 @@ l'énoncer de la question a laquelle il répond.
   return {finalPrompt, intent};
 }
 
+//-------------------------------------------------------------------------------------------//
 
-//------------------------------------------------------------------------------------//
+
+
+
+//-------------------------------------------------------------------------------------------//
 /*
   Author       : Jordi
   Date         : 2025-05-07
@@ -387,7 +429,11 @@ async function logInteraction(userId, userPrompt, aiResponse, intent) {
 }
 
 
-//------------------------------------------------------------------------------------//
+//-------------------------------------------------------------------------------------------//
+
+
+
+//-------------------------------------------------------------------------------------------//
 
 // This is the route to send POST requests, these are XLMs because wechat sends XLMs.
 app.post('/wechat', async (req, res) => {
@@ -431,7 +477,14 @@ app.post('/wechat', async (req, res) => {
   });
 });
 
+//-------------------------------------------------------------------------------------------//
+
+
+//-------------------------------------------------------------------------------------------//
+
 // Run server
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
+
+//-------------------------------------------------------------------------------------------//
