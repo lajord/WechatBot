@@ -598,6 +598,9 @@ J'enrichie le prompt de l'ia pour la réponse de l'eleve
 
 
 
+app.get('/', (req, res) => {
+  res.send('✅ Serveur Express en ligne');
+});
 
 
 
