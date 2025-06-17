@@ -5,7 +5,7 @@ import OpenAI from "openai"; // for use deepseek
 import fs from 'fs';
 import path from 'path';
 import { createHash } from 'crypto';
-import { pipeline } from '@xenova/transformers';
+// import { pipeline } from '@xenova/transformers';
 
 
 
@@ -26,21 +26,21 @@ if (!fs.existsSync(LOGS_DIR)) {
 // Load the embedding model
 // This will be used to create embeddings for the documents
 
-let embeddingPipeline = null;
-let isModelReady = false;
+// let embeddingPipeline = null;
+// let isModelReady = false;
 
 
-async function loadEmbeddingModel() {
-  try {
-    console.log("⏳ Loading embedding model...");
-    embeddingPipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-    isModelReady = true;
-    console.log("✅ Embedding model loaded and ready.");
-  } catch (error) {
-    console.error("❌ Failed to load embedding model:", error);
-  }
-}
-loadEmbeddingModel();
+// async function loadEmbeddingModel() {
+//   try {
+//     console.log("⏳ Loading embedding model...");
+//     embeddingPipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+//     isModelReady = true;
+//     console.log("✅ Embedding model loaded and ready.");
+//   } catch (error) {
+//     console.error("❌ Failed to load embedding model:", error);
+//   }
+// }
+// loadEmbeddingModel();
 
 
 
@@ -523,73 +523,73 @@ Ensuite je dois trouver un moyen pour détecter quand enrichir les questions
 Je transforme la requetes de l'utilisateur en embeding et je fais une comparaison cos avec mes embedings stocké
 J'enrichie le prompt de l'ia pour la réponse de l'eleve
 
-*/
+// */
 
-const DOCUMENTS_DIR = './documents';
+// const DOCUMENTS_DIR = './documents';
 
-app.post('/upload-doc', async (req, res) => {
-  if (!isModelReady) {
-    return res.status(503).send("⏳ Embedding model not ready yet. Try again in a few seconds.");
-  }
+// app.post('/upload-doc', async (req, res) => {
+//   if (!isModelReady) {
+//     return res.status(503).send("⏳ Embedding model not ready yet. Try again in a few seconds.");
+//   }
 
-  const { filename } = req.query;
-  if (!filename) return res.status(400).send("Missing filename");
+//   const { filename } = req.query;
+//   if (!filename) return res.status(400).send("Missing filename");
 
-  const filePath = path.join(DOCUMENTS_DIR, filename);
-  if (!fs.existsSync(filePath)) return res.status(404).send("File not found");
+//   const filePath = path.join(DOCUMENTS_DIR, filename);
+//   if (!fs.existsSync(filePath)) return res.status(404).send("File not found");
 
-  try {
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    const chunks = splitIntoChunks(fileContent);
-    const embeddedChunks = [];
+//   try {
+//     const fileContent = fs.readFileSync(filePath, 'utf8');
+//     const chunks = splitIntoChunks(fileContent);
+//     const embeddedChunks = [];
 
-    for (const chunk of chunks) {
-      const vector = await embedChunk(chunk);
-      embeddedChunks.push({ chunk, vector });
-    }
+//     for (const chunk of chunks) {
+//       const vector = await embedChunk(chunk);
+//       embeddedChunks.push({ chunk, vector });
+//     }
 
-    const outPath = path.join('./vectorstore', filename.replace(/\.[^/.]+$/, '') + '.json');
-    if (!fs.existsSync('./vectorstore')) fs.mkdirSync('./vectorstore');
-    fs.writeFileSync(outPath, JSON.stringify(embeddedChunks, null, 2));
+//     const outPath = path.join('./vectorstore', filename.replace(/\.[^/.]+$/, '') + '.json');
+//     if (!fs.existsSync('./vectorstore')) fs.mkdirSync('./vectorstore');
+//     fs.writeFileSync(outPath, JSON.stringify(embeddedChunks, null, 2));
 
-    res.send(`✅ Document "${filename}" traité et vectorisé (${embeddedChunks.length} chunks).`);
+//     res.send(`✅ Document "${filename}" traité et vectorisé (${embeddedChunks.length} chunks).`);
 
-  } catch (err) {
-    console.error("Error processing document:", err);
-    res.status(500).send("Internal error processing document");
-  }
-});
-
-
+//   } catch (err) {
+//     console.error("Error processing document:", err);
+//     res.status(500).send("Internal error processing document");
+//   }
+// });
 
 
-// Text c'est le docuemnts que on a import et maxLength c'est la taille max de chaque chunk
-
-function splitIntoChunks(text, maxLength = 1000) {
-  const paragraphs = text.split(/\n\s*\n/); // split by double newlines
-  const chunks = [];
-  let current = '';
-
-  for (const para of paragraphs) {
-    if ((current + para).length <= maxLength) {
-      current += para + '\n\n';
-    } else {
-      if (current) chunks.push(current.trim());
-      current = para + '\n\n';
-    }
-  }
-  if (current) chunks.push(current.trim());
-  return chunks;
-}
 
 
-async function embedChunk(text) {
-  if (!embeddingPipeline) {
-    throw new Error("Embedding model not loaded");
-  }
-  const output = await embeddingPipeline(text, { pooling: 'mean', normalize: true });
-  return output.data; // array of floats
-}
+// // Text c'est le docuemnts que on a import et maxLength c'est la taille max de chaque chunk
+
+// function splitIntoChunks(text, maxLength = 1000) {
+//   const paragraphs = text.split(/\n\s*\n/); // split by double newlines
+//   const chunks = [];
+//   let current = '';
+
+//   for (const para of paragraphs) {
+//     if ((current + para).length <= maxLength) {
+//       current += para + '\n\n';
+//     } else {
+//       if (current) chunks.push(current.trim());
+//       current = para + '\n\n';
+//     }
+//   }
+//   if (current) chunks.push(current.trim());
+//   return chunks;
+// }
+
+
+// async function embedChunk(text) {
+//   if (!embeddingPipeline) {
+//     throw new Error("Embedding model not loaded");
+//   }
+//   const output = await embeddingPipeline(text, { pooling: 'mean', normalize: true });
+//   return output.data; // array of floats
+// }
 
 
 
