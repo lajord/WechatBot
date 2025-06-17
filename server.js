@@ -4,7 +4,15 @@ import xml2js from 'xml2js'; // To manage XLM requests
 import OpenAI from "openai"; // for use deepseek
 import fs from 'fs';
 import path from 'path';
+import { createHash } from 'crypto';
+import { pipeline } from '@xenova/transformers';
 
+
+
+
+const app = express();
+const PORT = 3000;
+const LOG_FILE = './logs.json';
 
 
 const LOGS_DIR = './logs';
@@ -13,9 +21,29 @@ if (!fs.existsSync(LOGS_DIR)) {
 }
 
 
-const app = express();
-const PORT = 8080;
-const LOG_FILE = './logs.json';
+
+//-------------------------------------------------------------------------------------------//
+// Load the embedding model
+// This will be used to create embeddings for the documents
+
+let embeddingPipeline = null;
+let isModelReady = false;
+
+
+async function loadEmbeddingModel() {
+  try {
+    console.log("⏳ Loading embedding model...");
+    embeddingPipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+    isModelReady = true;
+    console.log("✅ Embedding model loaded and ready.");
+  } catch (error) {
+    console.error("❌ Failed to load embedding model:", error);
+  }
+}
+loadEmbeddingModel();
+
+
+
 
 app.use(bodyParser.text({ type: 'application/xml' })); //this line indicates that the inputs to be read will be in XLM format
 
@@ -25,6 +53,10 @@ const openai = new OpenAI({
   apiKey: 'sk-7e8eab473f97484c97dd0be91cb192f0'
 });
 
+//-------------------------------------------------------------------------------------------//
+
+
+//-------------------------------------------------------------------------------------------//
 
 // This function call DeepSeek's API, take in parameters a prompt and return a response
 async function ApiCallDeepseek(prompt) {
@@ -32,35 +64,49 @@ async function ApiCallDeepseek(prompt) {
     const response = await openai.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "deepseek-chat",
-      //max_tokens: 400 //limite la réponse a 400 tokens 
     });
-
     return response.choices[0].message.content;
+
   } catch (error) {
     console.error("Error occurs with DeepSeek connection API", error);
     return `Erreur API DeepSeek : ${error.message || error}`;
   }
 }
 
+//-------------------------------------------------------------------------------------------//
+
+
+//-------------------------------------------------------------------------------------------//
+
 /*
 The purpose of this function is to detect what type of request the user made.
 By this way we can create a response more coherent with the user intention
+
+Ici y'aura un travail d'entrainer un petit model pour detecter les intentions de l'utilisateur.
+
 */
 async function buildFinalPrompt(userPrompt, userId)
  {
+
+  //First prompt to identify the nature of the user's request 
   const intentDetectionPrompt = `
-      Here is a user query: "${userPrompt}"
-
-      Identify the type(s) of request this query represents. You can select one or more labels from the following list:
-
-      - explanation_notion_ml
-      - correction_student_input
-      - exam_creation
-      - generate_study_plan
-      - other
-
-      Return only the labels, separated by commas. Do not add explanations.
-      `; 
+  Here is a user query: "${userPrompt}"
+  
+  Identify the type(s) of request this query represents. You can select one or more labels from the following list:
+  
+  - explanation_notion_ml
+  - correction_student_input
+  - exam_creation
+  - generate_study_plan
+  - other
+  
+  Rules:
+  - If the request is not related to machine learning, regardless of intent or content, return only: other.
+  - Do NOT combine "other" with any other labels. If it's not about machine learning, the answer must be strictly: other.
+  - Do not try to reinterpret general topics (math, programming, etc.) as ML if not explicitly linked.
+  
+  Return only the labels, separated by commas. Do not add explanations.
+  `;
   
   let intent;
   try {
@@ -73,22 +119,25 @@ async function buildFinalPrompt(userPrompt, userId)
   let finalPrompt;
   const lowerIntent = intent.toLowerCase();
   console.log(lowerIntent)
-  if (lowerIntent.includes("explanation_notion_ml") && lowerIntent.includes("correction_creation_code_algo_machinelearning")) {
-    finalPrompt = `Speak in English, The student is asking both for a concept explanation and for help coding it. 
-  Start by explaining the machine learning concept clearly, as an expert teacher would, 
-  getting straight to the point without sacrificing comprehension. 
-  Then, follow the same rules as in the case of code creation or correction: 
-  do not give a full solution but provide structure, possible errors, or useful hints. 
-  Here's the full request:
-  """
-  ${userPrompt}
-  """`;
-  
-  } else if (lowerIntent.includes("explanation_notion_ml")) {
+  if (lowerIntent.includes("explanation_notion_ml") && lowerIntent.includes("correction_student_input")) {
+        finalPrompt = `Speak in English. The student is asking for both an explanation of a machine learning concept and help with related code or reasoning. 
+
+    Start by explaining the concept the student wants to understand in a clear, pedagogical, and efficient way, just as an expert teacher would. Adapt the explanation depending on the student's input:
+
+    - If the student makes a statement about the concept that seems incorrect or unclear, correct it with a constructive tone and use the opportunity to deepen the explanation.
+    - If the student is asking for help writing code, guide them by suggesting structure, pointing out possible challenges or common mistakes, and offering useful hints — but **do not** provide a full solution.
+    - If the student provides code, review it and help correct mistakes while reinforcing the conceptual understanding behind the fix.
+
+    Here is the full student request:
+    """
+    ${userPrompt}
+    """`;
+    }
+  else if (lowerIntent.includes("explanation_notion_ml")&& lowerIntent.includes("correction_creation_code_algo_machinelearning")) {
     finalPrompt = `Speak in English, Here's a student's request: ${userPrompt}, Explain this concept of machine learning clearly, as an expert teacher would, 
     Get straight to the point without sacrificing comprehension.`;
 
-  } else if (lowerIntent.includes("generate_study_plan")) {
+  }else if (lowerIntent.includes("generate_study_plan")) {
         const sanitizedUserId = userId.replace(/[^a-zA-Z0-9-_]/g, "_");
         const userLogFile = path.join(LOGS_DIR, `${sanitizedUserId}.json`);
 
@@ -149,34 +198,7 @@ async function buildFinalPrompt(userPrompt, userId)
       
 
   
-  } else if (lowerIntent.includes("correction_creation_code_algo_machinelearning")) {
-    finalPrompt = `Speak in English,  Here's an exchange with a student. You're a teacher who's an expert in programming and pedagogy. Your aim is to help him progress without doing the work for him. Analyze what the student has provided and adapt your response according to the following cases:
-  
-    1. If the student asks you **to code for him** from a simple instruction without having tried, **don't give a complete solution**. Provide only :
-       - food for thought,
-       - the general structure of the reasoning,
-       - and a method for getting started.
-    
-    2. If the student provides **only code without explanation**, do an **in-depth analysis**:
-       - detect syntax or logic errors,
-       - identify classic malpractices or pitfalls,
-       - explains ambiguous or problematic parts of the code,
-       - and suggests areas for improvement.
-    
-    3. If the student provides code accompanied by an **error or bug**, focus on :
-       - precise identification of the error,
-       - a clear explanation of its probable cause,
-       - possible hypotheses if the error is contextual,
-       - and a solution or suggested correction if you're sure.
-    
-    Always respond in a clear, structured and educational way. Your aim is not just to correct, but to teach the student to better understand his error and progress in his logic.
-    
-    Here's what the student wrote:  
-    “"”  
-    ${userPrompt}  
-    “"”`;
-  
-  }else if (lowerIntent.includes("exam_creation")) {
+  } else if (lowerIntent.includes("exam_creation")) {
     finalPrompt = `Speak in English. You're a highly qualified machine learning instructor tasked with creating **challenging and pedagogically sound exams** for students.
 
 The student has submitted a request describing what they want to be tested on. Your goal is to create a **rigorous and coherent exam** based on their needs, ensuring the difficulty is appropriate for a university-level course in machine learning, deep learning or NLP.
@@ -270,7 +292,29 @@ l'énoncer de la question a laquelle il répond.
   ${userPrompt}
   """`;
   }else if (lowerIntent.includes("other")) {
-    finalPrompt = `Speak in English, You have to answer word by word and say nothing other than: I'm sorry I'm not created to answer this kind of question.`;
+    finalPrompt = `
+      Speak in English.
+
+      You are a polite and focused AI assistant designed to help students understand and practice **machine learning**.
+
+      If a user asks a question that is **not related to machine learning**, you must **refuse to answer**, without improvising or guessing.
+
+      Instead, clearly explain:
+      - That you are specialized in machine learning.
+      - That your role is to support students in four main ways:
+        1. Explaining ML concepts in a simple, clear way.
+        2. Analyzing and correcting code or answers related to ML.
+        3. Generating exam questions to help students practice.
+        4. Building personalized revision plans based on the student's weaknesses.
+
+      Be kind, but stay strict: do **not** answer off-topic questions.
+
+      Here is the user's message:
+      """
+      ${userPrompt}
+      """
+      `;
+
   
   
   }else {
@@ -281,8 +325,12 @@ l'énoncer de la question a laquelle il répond.
   return {finalPrompt, intent};
 }
 
+//-------------------------------------------------------------------------------------------//
 
-//------------------------------------------------------------------------------------//
+
+
+
+//-------------------------------------------------------------------------------------------//
 /*
   Author       : Jordi
   Date         : 2025-05-07
@@ -387,7 +435,11 @@ async function logInteraction(userId, userPrompt, aiResponse, intent) {
 }
 
 
-//------------------------------------------------------------------------------------//
+//-------------------------------------------------------------------------------------------//
+
+
+
+//-------------------------------------------------------------------------------------------//
 
 // This is the route to send POST requests, these are XLMs because wechat sends XLMs.
 app.post('/wechat', async (req, res) => {
@@ -431,7 +483,124 @@ app.post('/wechat', async (req, res) => {
   });
 });
 
+
+//-------------------------------------------------------------------------------------------//
+
+
+
+const TOKEN = 'mon_token_secret';
+
+app.get('/wechat', (req, res) => {
+  try {
+    const { signature, timestamp, nonce, echostr } = req.query;
+    console.log("WeChat validation received:", req.query);
+
+    const arr = [TOKEN, timestamp, nonce].sort();
+    const str = arr.join('');
+    const hash = createHash('sha1').update(str).digest('hex');
+
+    if (hash === signature) {
+      console.log("Signature valid !");
+      res.send(echostr);
+    } else {
+      console.warn("Invalid signature.");
+      res.send("Unauthorized");
+    }
+  } catch (err) {
+    console.error("Error in /wechat GET route:", err);
+    res.status(500).send("Internal error");
+  }
+});
+
+//--------------------------------------------------------------------------------------------//
+
+/*
+
+Partie RAG
+Pour la récup de document comme je suis pas connecter a wechat je vais faire une route qui permet de charger un document depuis un dossier local.
+Ensuite je coupe en chunk et transorme en embedding pour les stocker dans la base de données vectorielle.
+Ensuite je dois trouver un moyen pour détecter quand enrichir les questions
+Je transforme la requetes de l'utilisateur en embeding et je fais une comparaison cos avec mes embedings stocké
+J'enrichie le prompt de l'ia pour la réponse de l'eleve
+
+*/
+
+const DOCUMENTS_DIR = './documents';
+
+app.post('/upload-doc', async (req, res) => {
+  if (!isModelReady) {
+    return res.status(503).send("⏳ Embedding model not ready yet. Try again in a few seconds.");
+  }
+
+  const { filename } = req.query;
+  if (!filename) return res.status(400).send("Missing filename");
+
+  const filePath = path.join(DOCUMENTS_DIR, filename);
+  if (!fs.existsSync(filePath)) return res.status(404).send("File not found");
+
+  try {
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    const chunks = splitIntoChunks(fileContent);
+    const embeddedChunks = [];
+
+    for (const chunk of chunks) {
+      const vector = await embedChunk(chunk);
+      embeddedChunks.push({ chunk, vector });
+    }
+
+    const outPath = path.join('./vectorstore', filename.replace(/\.[^/.]+$/, '') + '.json');
+    if (!fs.existsSync('./vectorstore')) fs.mkdirSync('./vectorstore');
+    fs.writeFileSync(outPath, JSON.stringify(embeddedChunks, null, 2));
+
+    res.send(`✅ Document "${filename}" traité et vectorisé (${embeddedChunks.length} chunks).`);
+
+  } catch (err) {
+    console.error("Error processing document:", err);
+    res.status(500).send("Internal error processing document");
+  }
+});
+
+
+
+
+// Text c'est le docuemnts que on a import et maxLength c'est la taille max de chaque chunk
+
+function splitIntoChunks(text, maxLength = 1000) {
+  const paragraphs = text.split(/\n\s*\n/); // split by double newlines
+  const chunks = [];
+  let current = '';
+
+  for (const para of paragraphs) {
+    if ((current + para).length <= maxLength) {
+      current += para + '\n\n';
+    } else {
+      if (current) chunks.push(current.trim());
+      current = para + '\n\n';
+    }
+  }
+  if (current) chunks.push(current.trim());
+  return chunks;
+}
+
+
+async function embedChunk(text) {
+  if (!embeddingPipeline) {
+    throw new Error("Embedding model not loaded");
+  }
+  const output = await embeddingPipeline(text, { pooling: 'mean', normalize: true });
+  return output.data; // array of floats
+}
+
+
+
+
+
+
+//-------------------------------------------------------------------------------------------//
+
 // Run server
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
+
+//-------------------------------------------------------------------------------------------//
