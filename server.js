@@ -589,6 +589,10 @@ J'enrichie le prompt de l'ia pour la réponse de l'eleve
 //   }
 //   const output = await embeddingPipeline(text, { pooling: 'mean', normalize: true });
 //   return output.data; // array of floats
+
+
+
+
 // }
 
 
@@ -599,7 +603,7 @@ J'enrichie le prompt de l'ia pour la réponse de l'eleve
 //-------------------------------------------------------------------------------------------//
 
 // Run server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server started on port ${PORT}`);
 });
 
