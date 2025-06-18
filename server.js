@@ -45,8 +45,7 @@ if (!fs.existsSync(LOGS_DIR)) {
 
 
 
-
-app.use(bodyParser.text({ type: 'application/xml' })); //this line indicates that the inputs to be read will be in XLM format
+app.use(bodyParser.text({ type: '*/*' })); //this line indicates that the inputs to be read will be in XLM format
 
 //API connection
 const openai = new OpenAI({
