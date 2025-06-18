@@ -11,7 +11,7 @@ import { createHash } from 'crypto';
 
 
 const app = express();
-const PORT = 8080;
+const PORT = 80;
 
 const LOG_FILE = './logs.json';
 
