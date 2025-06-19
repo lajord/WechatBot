@@ -446,7 +446,6 @@ app.post('/wechat', async (req, res) => {
   const rawXml = req.body;
   console.log("📩 Requête XML brute reçue de WeChat :\n", rawXml);
 
-
   xml2js.parseString(rawXml, async (err, result) => {
     if (err) {
       console.error("Erreur de parsing XML :", err);
@@ -455,63 +454,52 @@ app.post('/wechat', async (req, res) => {
 
     try {
       const userPrompt = result.xml.Content?.[0];
-      const fromUser = result.xml.FromUserName?.[0];   //Je dois utiliser ca comme clé pour enregistrer les message pour la mémoire 
+      const fromUser = result.xml.FromUserName?.[0];
+      const toUser = result.xml.ToUserName?.[0];
 
-      if (!userPrompt || !fromUser) {
-        console.warn("Incomplete data in XML request.");
-        return res.status(400).send("Invalid request.");
+      if (!userPrompt || !fromUser || !toUser) {
+        console.warn("Données incomplètes dans la requête XML.");
+        return res.status(400).send("Requête invalide.");
       }
 
+      // ⏳ Répondre immédiatement à WeChat avec un message temporaire
+      const tempReply = `Je traite ta question : « ${userPrompt.trim()} »... Attends quelques secondes.`;
+
+      const now = Math.floor(Date.now() / 1000); // timestamp en secondes
+      const xmlResponse = `
+        <xml>
+          <ToUserName><![CDATA[${fromUser}]]></ToUserName>
+          <FromUserName><![CDATA[${toUser}]]></FromUserName>
+          <CreateTime>${now}</CreateTime>
+          <MsgType><![CDATA[text]]></MsgType>
+          <Content><![CDATA[${tempReply}]]></Content>
+        </xml>
+      `.trim();
+
+      res.set('Content-Type', 'application/xml');
+      res.status(200).send(xmlResponse); // Réponse rapide à WeChat ✅
+
+      // 💬 Ensuite : traitement complet asynchrone
       const { finalPrompt, intent } = await buildFinalPrompt(userPrompt, fromUser);
 
       if (!finalPrompt) {
-        console.error("Prompt final empty.");
-        return res.status(500).send("Processing error.");
+        console.error("❌ Prompt final vide.");
+        return;
       }
 
       const response = await ApiCallDeepseek(finalPrompt);
+      await logInteraction(fromUser, userPrompt, response, intent);
 
-      logInteraction(fromUser, userPrompt, response, intent);
+      console.log("✅ Prompt final envoyé à l'IA :", finalPrompt);
+      console.log("✅ Réponse IA :", response);
 
-      console.log("Prompt final sent to AI:", finalPrompt);
-      console.log("AI response:", response);
-
-      res.status(200).send(response || "No answer.");
+      // Tu pourrais ici appeler l'API WeChat pour répondre via leur SDK
+      // Mais ce serait via une requête POST en dehors de la callback
 
     } catch (e) {
-      console.error("Processing error :", e);
-      res.status(500).send("Internal error.");
+      console.error("❌ Erreur de traitement :", e);
     }
   });
-});
-
-
-//-------------------------------------------------------------------------------------------//
-
-
-
-const TOKEN = 'mon_token_secret';
-
-app.get('/wechat', (req, res) => {
-  try {
-    const { signature, timestamp, nonce, echostr } = req.query;
-    console.log("WeChat validation received:", req.query);
-
-    const arr = [TOKEN, timestamp, nonce].sort();
-    const str = arr.join('');
-    const hash = createHash('sha1').update(str).digest('hex');
-
-    if (hash === signature) {
-      console.log("Signature valid !");
-      res.send(echostr);
-    } else {
-      console.warn("Invalid signature.");
-      res.send("Unauthorized");
-    }
-  } catch (err) {
-    console.error("Error in /wechat GET route:", err);
-    res.status(500).send("Internal error");
-  }
 });
 
 //--------------------------------------------------------------------------------------------//
