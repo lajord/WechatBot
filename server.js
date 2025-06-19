@@ -458,49 +458,46 @@ app.post('/wechat', async (req, res) => {
       const toUser = result.xml.ToUserName?.[0];
 
       if (!userPrompt || !fromUser || !toUser) {
-        console.warn("Données incomplètes dans la requête XML.");
+        console.warn("❌ Données XML incomplètes.");
         return res.status(400).send("Requête invalide.");
       }
 
-      // ⏳ Répondre immédiatement à WeChat avec un message temporaire
-      const tempReply = `Je traite ta question : « ${userPrompt.trim()} »... Attends quelques secondes.`;
+      // ✨ Génération du prompt
+      const { finalPrompt, intent } = await buildFinalPrompt(userPrompt, fromUser);
+      if (!finalPrompt) {
+        console.error("❌ Prompt vide.");
+        return res.status(500).send("Erreur IA");
+      }
 
-      const now = Math.floor(Date.now() / 1000); // timestamp en secondes
+      // 🧠 Appel à l’IA
+      const response = await ApiCallDeepseek(finalPrompt);
+      await logInteraction(fromUser, userPrompt, response, intent);
+
+      console.log("✅ Prompt final :", finalPrompt);
+      console.log("✅ Réponse IA :", response);
+
+      // 📨 Création de la réponse XML
+      const now = Math.floor(Date.now() / 1000);
       const xmlResponse = `
         <xml>
           <ToUserName><![CDATA[${fromUser}]]></ToUserName>
           <FromUserName><![CDATA[${toUser}]]></FromUserName>
           <CreateTime>${now}</CreateTime>
           <MsgType><![CDATA[text]]></MsgType>
-          <Content><![CDATA[${tempReply}]]></Content>
+          <Content><![CDATA[${response.trim()}]]></Content>
         </xml>
       `.trim();
 
       res.set('Content-Type', 'application/xml');
-      res.status(200).send(xmlResponse); // Réponse rapide à WeChat ✅
-
-      // 💬 Ensuite : traitement complet asynchrone
-      const { finalPrompt, intent } = await buildFinalPrompt(userPrompt, fromUser);
-
-      if (!finalPrompt) {
-        console.error("❌ Prompt final vide.");
-        return;
-      }
-
-      const response = await ApiCallDeepseek(finalPrompt);
-      await logInteraction(fromUser, userPrompt, response, intent);
-
-      console.log("✅ Prompt final envoyé à l'IA :", finalPrompt);
-      console.log("✅ Réponse IA :", response);
-
-      // Tu pourrais ici appeler l'API WeChat pour répondre via leur SDK
-      // Mais ce serait via une requête POST en dehors de la callback
+      res.status(200).send(xmlResponse);
 
     } catch (e) {
-      console.error("❌ Erreur de traitement :", e);
+      console.error("❌ Erreur dans le traitement :", e);
+      return res.status(500).send("Erreur serveur.");
     }
   });
 });
+
 
 //--------------------------------------------------------------------------------------------//
 
