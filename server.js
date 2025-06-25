@@ -7,7 +7,7 @@ import path from 'path';
 import { createHash } from 'crypto';
 // import { pipeline } from '@xenova/transformers';
 import axios from 'axios';
-import { processWeChatImage } from './handleImage.js';
+import { processWeChatImage } from './handleImages.js';
 
 
 
