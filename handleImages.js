@@ -20,12 +20,19 @@ export async function processWeChatImage(imageUrl, userId) {
 
     console.log("✅ Texte OCR extrait pour", userId);
 
-    // 3. Stocker texte OCR dans fichier JSON
+    // 3. Supprimer l’image
+    try {
+      fs.unlinkSync(imagePath);
+      console.log("🗑️ Image supprimée :", imagePath);
+    } catch (deleteErr) {
+      console.warn("⚠️ Impossible de supprimer l’image :", deleteErr.message);
+    }
+
+    // 4. Stocker le texte OCR
     const outputPath = `./ocr/${userId.replace(/[^a-zA-Z0-9-_]/g, "_")}.json`;
     const ocrLog = {
       timestamp: new Date().toISOString(),
-      text: text.trim(),
-      imagePath
+      text: text.trim()
     };
 
     let existing = [];
