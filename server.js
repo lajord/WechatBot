@@ -6,8 +6,13 @@ import fs from 'fs';
 import path from 'path';
 import { createHash } from 'crypto';
 // import { pipeline } from '@xenova/transformers';
+import axios from 'axios';
 
 
+
+
+const APPID = 'wx34853bb2155b4634';       
+const APPSECRET = '...';     
 
 
 const app = express();
@@ -33,12 +38,12 @@ if (!fs.existsSync(LOGS_DIR)) {
 
 // async function loadEmbeddingModel() {
 //   try {
-//     console.log("⏳ Loading embedding model...");
+//     console.log(" Loading embedding model...");
 //     embeddingPipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
 //     isModelReady = true;
-//     console.log("✅ Embedding model loaded and ready.");
+//     console.log(" Embedding model loaded and ready.");
 //   } catch (error) {
-//     console.error("❌ Failed to load embedding model:", error);
+//     console.error(" Failed to load embedding model:", error);
 //   }
 // }
 // loadEmbeddingModel();
@@ -195,6 +200,7 @@ async function buildFinalPrompt(userPrompt, userId)
         - Bonus: ...
         `;
         
+          
       
 
   
@@ -444,7 +450,7 @@ async function logInteraction(userId, userPrompt, aiResponse, intent) {
 // This is the route to send POST requests, these are XLMs because wechat sends XLMs.
 app.post('/wechat', async (req, res) => {
   const rawXml = req.body;
-  console.log("📩 Requête XML brute reçue de WeChat :\n", rawXml);
+  console.log(" Requête XML brute reçue de WeChat :\n", rawXml);
 
   xml2js.parseString(rawXml, async (err, result) => {
     if (err) {
@@ -453,139 +459,101 @@ app.post('/wechat', async (req, res) => {
     }
 
     try {
-      const userPrompt = result.xml.Content?.[0];
+      const msgType = result.xml.MsgType?.[0]; // 'text', 'image', etc.
       const fromUser = result.xml.FromUserName?.[0];
       const toUser = result.xml.ToUserName?.[0];
+      const now = Math.floor(Date.now() / 1000);
 
-      if (!userPrompt || !fromUser || !toUser) {
-        console.warn("❌ Données XML incomplètes.");
+      if (!msgType || !fromUser || !toUser) {
+        console.warn("Données XML incomplètes.");
         return res.status(400).send("Requête invalide.");
       }
 
-      // ✨ Génération du prompt
-      const { finalPrompt, intent } = await buildFinalPrompt(userPrompt, fromUser);
-      if (!finalPrompt) {
-        console.error("❌ Prompt vide.");
-        return res.status(500).send("Erreur IA");
+      if (msgType === 'text') {
+        const userPrompt = result.xml.Content?.[0];
+        if (!userPrompt) {
+          console.warn("Texte vide.");
+          return res.status(400).send("Texte manquant.");
+        }
+
+        const { finalPrompt, intent } = await buildFinalPrompt(userPrompt, fromUser);
+        const response = await ApiCallDeepseek(finalPrompt);
+        await logInteraction(fromUser, userPrompt, response, intent);
+
+        const xmlResponse = `
+          <xml>
+            <ToUserName><![CDATA[${fromUser}]]></ToUserName>
+            <FromUserName><![CDATA[${toUser}]]></FromUserName>
+            <CreateTime>${now}</CreateTime>
+            <MsgType><![CDATA[text]]></MsgType>
+            <Content><![CDATA[${response.trim()}]]></Content>
+          </xml>`.trim();
+
+        res.set('Content-Type', 'application/xml');
+        return res.status(200).send(xmlResponse);
+
+      } else if (msgType === 'image') {
+        const imageUrl = result.xml.PicUrl?.[0];
+        if (!imageUrl) {
+          console.warn("Image sans URL.");
+          return res.status(400).send("Image invalide.");
+        }
+
+        console.log("Image reçue de l'utilisateur :", imageUrl);
+
+        // ✅ Étape suivante : OCR + traitement à faire ici
+
+        const xmlResponse = `
+          <xml>
+            <ToUserName><![CDATA[${fromUser}]]></ToUserName>
+            <FromUserName><![CDATA[${toUser}]]></FromUserName>
+            <CreateTime>${now}</CreateTime>
+            <MsgType><![CDATA[text]]></MsgType>
+            <Content><![CDATA[Image bien reçue !]]></Content>
+          </xml>`.trim();
+
+        res.set('Content-Type', 'application/xml');
+        return res.status(200).send(xmlResponse);
+
+      } else {
+        console.log("Type de message non géré :", msgType);
+
+        const xmlResponse = `
+          <xml>
+            <ToUserName><![CDATA[${fromUser}]]></ToUserName>
+            <FromUserName><![CDATA[${toUser}]]></FromUserName>
+            <CreateTime>${now}</CreateTime>
+            <MsgType><![CDATA[text]]></MsgType>
+            <Content><![CDATA[Désolé, je ne peux gérer que du texte ou des images pour le moment.]]></Content>
+          </xml>`.trim();
+
+        res.set('Content-Type', 'application/xml');
+        return res.status(200).send(xmlResponse);
       }
 
-      // 🧠 Appel à l’IA
-      const response = await ApiCallDeepseek(finalPrompt);
-      await logInteraction(fromUser, userPrompt, response, intent);
-
-      console.log("✅ Prompt final :", finalPrompt);
-      console.log("✅ Réponse IA :", response);
-
-      // 📨 Création de la réponse XML
-      const now = Math.floor(Date.now() / 1000);
-      const xmlResponse = `
-        <xml>
-          <ToUserName><![CDATA[${fromUser}]]></ToUserName>
-          <FromUserName><![CDATA[${toUser}]]></FromUserName>
-          <CreateTime>${now}</CreateTime>
-          <MsgType><![CDATA[text]]></MsgType>
-          <Content><![CDATA[${response.trim()}]]></Content>
-        </xml>
-      `.trim();
-
-      res.set('Content-Type', 'application/xml');
-      res.status(200).send(xmlResponse);
-
     } catch (e) {
-      console.error("❌ Erreur dans le traitement :", e);
+      console.error("Erreur dans le traitement :", e);
       return res.status(500).send("Erreur serveur.");
     }
   });
 });
 
 
+
 //--------------------------------------------------------------------------------------------//
 
 /*
 
-Partie RAG
-Pour la récup de document comme je suis pas connecter a wechat je vais faire une route qui permet de charger un document depuis un dossier local.
-Ensuite je coupe en chunk et transorme en embedding pour les stocker dans la base de données vectorielle.
-Ensuite je dois trouver un moyen pour détecter quand enrichir les questions
-Je transforme la requetes de l'utilisateur en embeding et je fais une comparaison cos avec mes embedings stocké
-J'enrichie le prompt de l'ia pour la réponse de l'eleve
+Gérer le RAG
+-> Je peux pas envoyer de document style PDF etc ducoup ca sera via des screens, donc on récupere
+une image on la traduit en texte, on essaye de comprendre le contexte derrière tout ca.
+*/
 
-// */
-
-// const DOCUMENTS_DIR = './documents';
-
-// app.post('/upload-doc', async (req, res) => {
-//   if (!isModelReady) {
-//     return res.status(503).send("⏳ Embedding model not ready yet. Try again in a few seconds.");
-//   }
-
-//   const { filename } = req.query;
-//   if (!filename) return res.status(400).send("Missing filename");
-
-//   const filePath = path.join(DOCUMENTS_DIR, filename);
-//   if (!fs.existsSync(filePath)) return res.status(404).send("File not found");
-
-//   try {
-//     const fileContent = fs.readFileSync(filePath, 'utf8');
-//     const chunks = splitIntoChunks(fileContent);
-//     const embeddedChunks = [];
-
-//     for (const chunk of chunks) {
-//       const vector = await embedChunk(chunk);
-//       embeddedChunks.push({ chunk, vector });
-//     }
-
-//     const outPath = path.join('./vectorstore', filename.replace(/\.[^/.]+$/, '') + '.json');
-//     if (!fs.existsSync('./vectorstore')) fs.mkdirSync('./vectorstore');
-//     fs.writeFileSync(outPath, JSON.stringify(embeddedChunks, null, 2));
-
-//     res.send(`✅ Document "${filename}" traité et vectorisé (${embeddedChunks.length} chunks).`);
-
-//   } catch (err) {
-//     console.error("Error processing document:", err);
-//     res.status(500).send("Internal error processing document");
-//   }
-// });
-
-
-
-
-// // Text c'est le docuemnts que on a import et maxLength c'est la taille max de chaque chunk
-
-// function splitIntoChunks(text, maxLength = 1000) {
-//   const paragraphs = text.split(/\n\s*\n/); // split by double newlines
-//   const chunks = [];
-//   let current = '';
-
-//   for (const para of paragraphs) {
-//     if ((current + para).length <= maxLength) {
-//       current += para + '\n\n';
-//     } else {
-//       if (current) chunks.push(current.trim());
-//       current = para + '\n\n';
-//     }
-//   }
-//   if (current) chunks.push(current.trim());
-//   return chunks;
-// }
-
-
-// async function embedChunk(text) {
-//   if (!embeddingPipeline) {
-//     throw new Error("Embedding model not loaded");
-//   }
-//   const output = await embeddingPipeline(text, { pooling: 'mean', normalize: true });
-//   return output.data; // array of floats
-
-
-
-
-// }
 
 
 
 app.get('/', (req, res) => {
-  res.send('✅ Serveur Express en ligne');
+  res.send('Serveur Express en ligne');
 });
 
 
