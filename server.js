@@ -7,6 +7,8 @@ import path from 'path';
 import { createHash } from 'crypto';
 // import { pipeline } from '@xenova/transformers';
 import axios from 'axios';
+import { processWeChatImage } from './handleImage.js';
+
 
 
 
@@ -448,6 +450,8 @@ async function logInteraction(userId, userPrompt, aiResponse, intent) {
 //-------------------------------------------------------------------------------------------//
 
 // This is the route to send POST requests, these are XLMs because wechat sends XLMs.
+
+
 app.post('/wechat', async (req, res) => {
   const rawXml = req.body;
   console.log(" Requête XML brute reçue de WeChat :\n", rawXml);
@@ -471,10 +475,6 @@ app.post('/wechat', async (req, res) => {
 
       if (msgType === 'text') {
         const userPrompt = result.xml.Content?.[0];
-        if (!userPrompt) {
-          console.warn("Texte vide.");
-          return res.status(400).send("Texte manquant.");
-        }
 
         const { finalPrompt, intent } = await buildFinalPrompt(userPrompt, fromUser);
         const response = await ApiCallDeepseek(finalPrompt);
@@ -493,30 +493,22 @@ app.post('/wechat', async (req, res) => {
         return res.status(200).send(xmlResponse);
 
       } else if (msgType === 'image') {
+
         const imageUrl = result.xml.PicUrl?.[0];
         if (!imageUrl) {
           console.warn("Image sans URL.");
           return res.status(400).send("Image invalide.");
         }
 
-        console.log("Image reçue de l'utilisateur :", imageUrl);
+        console.log("Image reçue :", imageUrl);
 
-        // ✅ Étape suivante : OCR + traitement à faire ici
-
-        const xmlResponse = `
-          <xml>
-            <ToUserName><![CDATA[${fromUser}]]></ToUserName>
-            <FromUserName><![CDATA[${toUser}]]></FromUserName>
-            <CreateTime>${now}</CreateTime>
-            <MsgType><![CDATA[text]]></MsgType>
-            <Content><![CDATA[Image bien reçue !]]></Content>
-          </xml>`.trim();
-
-        res.set('Content-Type', 'application/xml');
-        return res.status(200).send(xmlResponse);
-
-      } else {
-        console.log("Type de message non géré :", msgType);
+        // Lancer OCR de manière synchrone ou asynchrone
+        processWeChatImage(imageUrl, fromUser)
+          .then(text => {
+            if (text) {
+              console.log("OCR terminé pour image :", text.slice(0, 100));
+            }
+          });
 
         const xmlResponse = `
           <xml>
@@ -524,13 +516,12 @@ app.post('/wechat', async (req, res) => {
             <FromUserName><![CDATA[${toUser}]]></FromUserName>
             <CreateTime>${now}</CreateTime>
             <MsgType><![CDATA[text]]></MsgType>
-            <Content><![CDATA[Désolé, je ne peux gérer que du texte ou des images pour le moment.]]></Content>
+            <Content><![CDATA[Image bien reçue ! Je vais analyser son contenu.]]></Content>
           </xml>`.trim();
 
         res.set('Content-Type', 'application/xml');
         return res.status(200).send(xmlResponse);
-      }
-
+      } 
     } catch (e) {
       console.error("Erreur dans le traitement :", e);
       return res.status(500).send("Erreur serveur.");
