@@ -4,32 +4,27 @@ import path from 'path';
 import Tesseract from 'tesseract.js';
 
 export async function processWeChatImage(imageUrl, userId) {
-  const imageId = `${Date.now()}_${userId}`;
-  const imagePath = `./images/${imageId}.jpg`;
-
   try {
-    // 1. Télécharger
+    // 1. Télécharger l’image en mémoire
     const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-    fs.writeFileSync(imagePath, response.data);
-    console.log("✅ Image téléchargée :", imagePath);
+    const imageBuffer = Buffer.from(response.data);
 
-    // 2. OCR
-    const { data: { text } } = await Tesseract.recognize(imagePath, 'eng+fra', {
+    console.log("✅ Image téléchargée (en mémoire)");
+
+    // 2. OCR sur le buffer directement (pas besoin d'écrire le fichier)
+    const { data: { text } } = await Tesseract.recognize(imageBuffer, 'eng+fra', {
       logger: m => console.log(`[OCR] ${m.status}: ${Math.floor(m.progress * 100)}%`)
     });
 
     console.log("✅ Texte OCR extrait pour", userId);
 
-    // 3. Supprimer l’image
-    try {
-      fs.unlinkSync(imagePath);
-      console.log("🗑️ Image supprimée :", imagePath);
-    } catch (deleteErr) {
-      console.warn("⚠️ Impossible de supprimer l’image :", deleteErr.message);
+    // 3. Stocker le texte OCR dans un JSON (logs utilisateur)
+    const ocrDir = path.resolve('./ocr');
+    if (!fs.existsSync(ocrDir)) {
+      fs.mkdirSync(ocrDir);
     }
 
-    // 4. Stocker le texte OCR
-    const outputPath = `./ocr/${userId.replace(/[^a-zA-Z0-9-_]/g, "_")}.json`;
+    const outputPath = path.join(ocrDir, `${userId.replace(/[^a-zA-Z0-9-_]/g, "_")}.json`);
     const ocrLog = {
       timestamp: new Date().toISOString(),
       text: text.trim()
