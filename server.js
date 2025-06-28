@@ -94,6 +94,19 @@ async function buildFinalPrompt(userPrompt, userId)
     - Build personalized study plans.
     `;
 
+  //Aller recup l'historique de l'user
+  const sanitizedUserId = userId.replace(/[^a-zA-Z0-9-_]/g, "_");
+  const userLogFile = path.join(LOGS_DIR, `${sanitizedUserId}.json`);
+
+  if (!fs.existsSync(userLogFile)) {
+    return {
+      finalPrompt: null,
+      intent: "generate_study_plan_no_data"
+    };
+  }
+
+  const feedbackHistory = JSON.parse(fs.readFileSync(userLogFile, 'utf8'));
+
 
   //First prompt to identify the nature of the user's request 
   const intentDetectionPrompt = `
@@ -154,17 +167,7 @@ async function buildFinalPrompt(userPrompt, userId)
         }
 
   else if (lowerIntent.includes("generate_study_plan")) {
-        const sanitizedUserId = userId.replace(/[^a-zA-Z0-9-_]/g, "_");
-        const userLogFile = path.join(LOGS_DIR, `${sanitizedUserId}.json`);
 
-        if (!fs.existsSync(userLogFile)) {
-          return {
-            finalPrompt: null,
-            intent: "generate_study_plan_no_data"
-          };
-        }
-
-        const feedbackHistory = JSON.parse(fs.readFileSync(userLogFile, 'utf8'));
 
         finalPrompt = `
 
@@ -318,6 +321,9 @@ l'énoncer de la question a laquelle il répond.
       - Constructive and friendly
       - Focused on learning, not doing the work for the student
 
+      Below is the student's performance history (feedback only). It may be short or detailed:
+      If the student asks you to, or if you think it's relevant, you can use the student's weaknesses as the basis for the exam.
+      ${JSON.stringify(feedbackHistory, null, 2)}
       
       Here is the student's message:
       """
