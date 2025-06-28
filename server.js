@@ -131,7 +131,10 @@ async function buildFinalPrompt(userPrompt, userId)
   const lowerIntent = intent.toLowerCase();
   console.log(lowerIntent)
   if (lowerIntent.includes("explanation_notion_ml") && lowerIntent.includes("correction_student_input")) {
-        finalPrompt = `Speak in English. The student is asking for both an explanation of a machine learning concept and help with related code or reasoning. 
+        finalPrompt = `Here are some basic rules:
+    Speak in English, don't use emojis in your replies, try to keep your replies short and to the point.
+    
+    . The student is asking for both an explanation of a machine learning concept and help with related code or reasoning. 
 
     Start by explaining the concept the student wants to understand in a clear, pedagogical, and efficient way, just as an expert teacher would. Adapt the explanation depending on the student's input:
 
@@ -147,7 +150,9 @@ async function buildFinalPrompt(userPrompt, userId)
     """`;
     }
   else if (lowerIntent.includes("explanation_notion_ml")&& lowerIntent.includes("correction_creation_code_algo_machinelearning")) {
-    finalPrompt = `Speak in English, Here's a student's request: ${userPrompt}, Explain this concept of machine learning clearly, as an expert teacher would, 
+    finalPrompt = `Here are some basic rules:
+    Speak in English, don't use emojis in your replies, try to keep your replies short and to the point.
+    , Here's a student's request: ${userPrompt}, Explain this concept of machine learning clearly, as an expert teacher would, 
     Get straight to the point without sacrificing comprehension.`;
 
   }else if (lowerIntent.includes("generate_study_plan")) {
@@ -164,6 +169,10 @@ async function buildFinalPrompt(userPrompt, userId)
         const feedbackHistory = JSON.parse(fs.readFileSync(userLogFile, 'utf8'));
 
         finalPrompt = `
+
+        Here are some basic rules:
+        Speak in English, don't use emojis in your replies, try to keep your replies short and to the point.
+
         You are an AI tutor assistant specialized in machine learning.
         
         Below is the student's performance history (feedback only). It may be short or detailed:
@@ -220,7 +229,10 @@ async function buildFinalPrompt(userPrompt, userId)
 
   
   } else if (lowerIntent.includes("exam_creation")) {
-    finalPrompt = `Speak in English. You're a highly qualified machine learning instructor tasked with creating **challenging and pedagogically sound exams** for students.
+    finalPrompt = `Here are some basic rules:
+    Speak in English, don't use emojis in your replies, try to keep your replies short and to the point.
+    
+    You're a highly qualified machine learning instructor tasked with creating **challenging and pedagogically sound exams** for students.
 
 The student has submitted a request describing what they want to be tested on. Your goal is to create a **rigorous and coherent exam** based on their needs, ensuring the difficulty is appropriate for a university-level course in machine learning, deep learning or NLP.
 
@@ -256,7 +268,10 @@ de regarder si il répond a une question précédement poser... Ca je dois l'ajo
 l'énoncer de la question a laquelle il répond. 
 */
   }else if (lowerIntent.includes("correction_student_input")) {
-    finalPrompt = `Speak in English. You are an expert AI assistant and pedagogue helping a student. The student has just sent you a message. Your task is to analyze what they provided and give constructive feedback.
+    finalPrompt = `Here are some basic rules:
+    Speak in English, don't use emojis in your replies, try to keep your replies short and to the point.
+    
+    You are an expert AI assistant and pedagogue helping a student. The student has just sent you a message. Your task is to analyze what they provided and give constructive feedback.
   
    Important: The student's message may contain **multiple elements**: a concept, an opinion, code, an error, or even a mix. You must identify each type of content and address it **individually**, with the right approach for each.
   
@@ -499,7 +514,7 @@ app.post('/wechat', async (req, res) => {
         const { finalPrompt, intent } = await buildFinalPrompt(userPrompt, fromUser);
         const response = await ApiCallDeepseek(finalPrompt);
         await logInteraction(fromUser, userPrompt, response, intent);
-
+        console.log("Réponse Deepseek :", response);
         const xmlResponse = `
           <xml>
             <ToUserName><![CDATA[${fromUser}]]></ToUserName>
