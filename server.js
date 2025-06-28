@@ -123,6 +123,31 @@ async function buildFinalPrompt(userPrompt, userId)
     console.error("Erreur détection d'intention :", error);
     intent = "idk"; 
   }
+
+  //On va chercher l'historique des screens fournit apr l'user
+  let ocrContext = '';
+  try {
+    const sanitizedId = userId.replace(/[^a-zA-Z0-9-_]/g, "_");
+    const ocrFile = path.join('./ocr', `${sanitizedId}.json`);
+
+    console.log("OCR lookup file path:", ocrFile);
+
+    if (fs.existsSync(ocrFile)) {
+      const logs = JSON.parse(fs.readFileSync(ocrFile, 'utf8'));
+      const lastEntries = logs.slice(-3).map(e => `- [${e.timestamp}]\n${e.text.trim()}`).join('\n\n');
+
+      ocrContext = `
+  Here is previous content sent by the student as screenshots (extracted via OCR):
+  ${lastEntries}
+
+  You may use it as background context to better understand the question.
+      `;
+    }
+  } catch (err) {
+    console.warn("Erreur lecture OCR context:", err);
+  }
+
+
   let finalPrompt;
   const lowerIntent = intent.toLowerCase();
   console.log(lowerIntent)
@@ -134,6 +159,8 @@ async function buildFinalPrompt(userPrompt, userId)
     - If the student makes a statement about the concept that seems incorrect or unclear, correct it with a constructive tone and use the opportunity to deepen the explanation.
     - If the student is asking for help writing code, guide them by suggesting structure, pointing out possible challenges or common mistakes, and offering useful hints — but **do not** provide a full solution.
     - If the student provides code, review it and help correct mistakes while reinforcing the conceptual understanding behind the fix.
+
+    ${ocrContext}
 
     Here is the full student request:
     """
@@ -200,6 +227,14 @@ async function buildFinalPrompt(userPrompt, userId)
         - Question 2: ...
         - Question 3: ...
         - Bonus: ...
+
+
+            ${ocrContext}
+
+        Here is the full student request:
+        """
+        ${userPrompt}
+        """
         `;
         
           
@@ -230,6 +265,8 @@ Follow these guidelines:
 
 
 4. Do **not include answers**. Just return the exam questions.
+
+${ocrContext}
 
 Here is the student's request:
 """ 
@@ -294,6 +331,8 @@ l'énoncer de la question a laquelle il répond.
   - Structured and easy to read
   - Constructive and friendly
   - Focused on learning, not doing the work for the student
+
+  ${ocrContext}
   
   Here is the student's message:
   """
