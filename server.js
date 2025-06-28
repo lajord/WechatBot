@@ -97,22 +97,27 @@ async function buildFinalPrompt(userPrompt, userId)
 
   //First prompt to identify the nature of the user's request 
   const intentDetectionPrompt = `
-  Here is a user query: "${userPrompt}"
-  
-  Identify the type(s) of request this query represents. You can select one or more labels from the following list:
-  
-  - explanation_notion_ml
-  - correction_student_input
-  - exam_creation
-  - generate_study_plan
-  - other
-  
-  Rules:
-  - If the request is not related to machine learning, regardless of intent or content, return only: other.
-  - Do NOT combine "other" with any other labels. If it's not about machine learning, the answer must be strictly: other.
-  - Do not try to reinterpret general topics (math, programming, etc.) as ML if not explicitly linked.
-  
-  Return only the labels, separated by commas. Do not add explanations.
+      Here is a user query: "${userPrompt}"
+
+      Your task is to classify it by intent. You MUST choose one or more labels from this list (and only from this list):
+
+      - explanation_notion_ml: The user wants an explanation or definition of a machine learning concept (e.g., "What is overfitting?", "Can you explain gradient descent?").
+
+      - correction_student_input: The user submits code, an answer, or a solution and expects feedback, debugging, or correction.
+
+      - exam_creation: The user asks to generate exercises, tests, or exam-style questions related to machine learning.
+
+      - generate_study_plan: The user wants help organizing their ML study or revision (e.g., "Can you build me a study plan?").
+
+      - other: The query is not about machine learning or doesn't fit any of the above (e.g., math, general programming, casual message).
+
+      Important rules:
+      - If the query is not related to machine learning, the ONLY valid response is: other.
+      - Never combine other with another label.
+      - Do NOT interpret math, stats, or general programming as ML unless clearly connected.
+
+      Return only the labels, comma-separated (e.g., explanation_notion_ml, correction_student_input). No extra words.
+
   `;
   
   let intent;
@@ -395,41 +400,31 @@ l'énoncer de la question a laquelle il répond.
 async function logInteraction(userId, userPrompt, aiResponse, intent) {
   if (intent.includes("exam_creation")) return;
 
-  // Prompt d’analyse succincte
   const analysisPrompt = `
   You are an AI tutor assistant.
-  
+
   Here is a student's message and your response:
-  
+
   STUDENT:
   "${userPrompt}"
-  
+
   TUTOR RESPONSE:
   "${aiResponse}"
-  
+
   Your task:
   - Evaluate if the student's message shows any misunderstanding or confusion.
   - If the student made a mistake or showed incomplete understanding, summarize it.
   - If the student clearly understood the concept, say so briefly.
   - If the message is too vague, irrelevant, or not related to machine learning understanding, return an empty JSON: {}
-  
-  Guidelines:
-  - Keep the summary short and factual (max 3 lines).
-  - Do NOT repeat the student's message.
-  - Do NOT add any text outside the JSON block.
-  
-  Return only a strict JSON in one of these formats:
-  
-  Case 1: 
+
+  Return only one of these:
   {
     "understanding": "good" | "partial" | "poor",
-    "summary": "One sentence summary of strengths and weaknesses."
+    "summary": "Short feedback."
   }
-  
-  Case 2 (no feedback possible):
-  {}
+
+  Or just: {}
   `;
-  
 
   let memoryNote = {
     understanding: "unknown",
@@ -444,13 +439,11 @@ async function logInteraction(userId, userPrompt, aiResponse, intent) {
     console.error("Erreur lors de l'analyse du feedback :", err);
   }
 
-  // Nouveau format de log : uniquement feedback + timestamp
   const logEntry = {
     timestamp: new Date().toISOString(),
     feedback: memoryNote
   };
 
-  // Nettoyer l'ID pour nom de fichier
   const sanitizedUserId = userId.replace(/[^a-zA-Z0-9-_]/g, "_");
   const userLogFile = path.join(LOGS_DIR, `${sanitizedUserId}.json`);
 
@@ -459,7 +452,16 @@ async function logInteraction(userId, userPrompt, aiResponse, intent) {
     if (fs.existsSync(userLogFile)) {
       const data = fs.readFileSync(userLogFile, 'utf8');
       logs = data ? JSON.parse(data) : [];
+
+      // 🔁 Garder seulement les logs < 24h
+      const now = new Date();
+      logs = logs.filter(entry => {
+        const entryTime = new Date(entry.timestamp);
+        const hoursDiff = (now - entryTime) / (1000 * 60 * 60);
+        return hoursDiff < 24;
+      });
     }
+
     logs.push(logEntry);
     fs.writeFileSync(userLogFile, JSON.stringify(logs, null, 2));
   } catch (err) {
