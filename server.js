@@ -30,27 +30,6 @@ if (!fs.existsSync(LOGS_DIR)) {
 
 
 
-//-------------------------------------------------------------------------------------------//
-// Load the embedding model
-// This will be used to create embeddings for the documents
-
-// let embeddingPipeline = null;
-// let isModelReady = false;
-
-
-// async function loadEmbeddingModel() {
-//   try {
-//     console.log(" Loading embedding model...");
-//     embeddingPipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-//     isModelReady = true;
-//     console.log(" Embedding model loaded and ready.");
-//   } catch (error) {
-//     console.error(" Failed to load embedding model:", error);
-//   }
-// }
-// loadEmbeddingModel();
-
-
 
 app.use(bodyParser.text({ type: '*/*' })); //this line indicates that the inputs to be read will be in XLM format
 
@@ -124,28 +103,28 @@ async function buildFinalPrompt(userPrompt, userId)
     intent = "idk"; 
   }
 
-  //On va chercher l'historique des screens fournit apr l'user
-  let ocrContext = '';
-  try {
-    const sanitizedId = userId.replace(/[^a-zA-Z0-9-_]/g, "_");
-    const ocrFile = path.join('./ocr', `${sanitizedId}.json`);
+  // //On va chercher l'historique des screens fournit apr l'user
+  // let ocrContext = '';
+  // try {
+  //   const sanitizedId = userId.replace(/[^a-zA-Z0-9-_]/g, "_");
+  //   const ocrFile = path.join('./ocr', `${sanitizedId}.json`);
 
-    console.log("OCR lookup file path:", ocrFile);
+  //   console.log("OCR lookup file path:", ocrFile);
 
-    if (fs.existsSync(ocrFile)) {
-      const logs = JSON.parse(fs.readFileSync(ocrFile, 'utf8'));
-      const lastEntries = logs.slice(-3).map(e => `- [${e.timestamp}]\n${e.text.trim()}`).join('\n\n');
+  //   if (fs.existsSync(ocrFile)) {
+  //     const logs = JSON.parse(fs.readFileSync(ocrFile, 'utf8'));
+  //     const lastEntries = logs.slice(-3).map(e => `- [${e.timestamp}]\n${e.text.trim()}`).join('\n\n');
 
-      ocrContext = `
-  Here is previous content sent by the student as screenshots (extracted via OCR):
-  ${lastEntries}
+  //     ocrContext = `
+  // Here is previous content sent by the student as screenshots (extracted via OCR):
+  // ${lastEntries}
 
-  You may use it as background context to better understand the question.
-      `;
-    }
-  } catch (err) {
-    console.warn("Erreur lecture OCR context:", err);
-  }
+  // You may use it as background context to better understand the question.
+  //     `;
+  //   }
+  // } catch (err) {
+  //   console.warn("Erreur lecture OCR context:", err);
+  // }
 
 
   let finalPrompt;
@@ -160,7 +139,7 @@ async function buildFinalPrompt(userPrompt, userId)
     - If the student is asking for help writing code, guide them by suggesting structure, pointing out possible challenges or common mistakes, and offering useful hints — but **do not** provide a full solution.
     - If the student provides code, review it and help correct mistakes while reinforcing the conceptual understanding behind the fix.
 
-    ${ocrContext}
+
 
     Here is the full student request:
     """
@@ -229,7 +208,6 @@ async function buildFinalPrompt(userPrompt, userId)
         - Bonus: ...
 
 
-            ${ocrContext}
 
         Here is the full student request:
         """
@@ -265,8 +243,6 @@ Follow these guidelines:
 
 
 4. Do **not include answers**. Just return the exam questions.
-
-${ocrContext}
 
 Here is the student's request:
 """ 
@@ -332,7 +308,6 @@ l'énoncer de la question a laquelle il répond.
   - Constructive and friendly
   - Focused on learning, not doing the work for the student
 
-  ${ocrContext}
   
   Here is the student's message:
   """
@@ -340,35 +315,41 @@ l'énoncer de la question a laquelle il répond.
   """`;
   }else if (lowerIntent.includes("other")) {
     finalPrompt = `
-      Speak in English.
+    Speak in English.
 
-      You are a polite and focused AI assistant designed to help students understand and practice **machine learning**.
+    You are a helpful and polite AI assistant specialized in **machine learning**.
 
-      If a user asks a question that is **not related to machine learning**, you must **refuse to answer**, without improvising or guessing.
+    Your behavior depends on the user’s intent:
 
-      Instead, clearly explain:
-      - That you are specialized in machine learning.
-      - That your role is to support students in four main ways:
-        1. Explaining ML concepts in a simple, clear way.
-        2. Analyzing and correcting code or answers related to ML.
-        3. Generating exam questions to help students practice.
-        4. Building personalized revision plans based on the student's weaknesses.
+    ---
 
-      Be kind, but stay strict: do **not** answer off-topic questions.
+    **Case 1 — Casual or polite message (e.g., greetings, small talk, thank you):**
+    - Reply in a friendly and welcoming tone.
+    - Acknowledge the user's message (e.g., "Hello!", "Nice to see you!" or "You're welcome!").
+    - Gently guide the user toward your actual purpose: helping with machine learning.
+    - Example: "Hi there! I'm your machine learning assistant. What would you like to study today?"
 
-      Here is the user's message:
-      """
-      ${userPrompt}
-      """
-      `;
+    ---
 
-  
-  
-  }else {
-    finalPrompt = `Speak in English, Explain that you didn't understand the user's request correctly`;
+    **Case 2 — User asks something that is NOT related to machine learning:**
+    - Do **not** try to answer the question.
+    - Kindly explain that you are focused solely on helping with machine learning topics.
+    - Clearly list the four types of things you can help with:
+      1. Explaining ML concepts
+      2. Reviewing student answers or code
+      3. Generating ML exam questions
+      4. Building personalized study plans
+
+    ---
+
+    Always be friendly, but stay focused on your mission.
+
+    Here is the user’s message:
+    """
+    ${userPrompt}
+    """
+    `;
   }
-  
-
   return {finalPrompt, intent};
 }
 
@@ -534,12 +515,6 @@ app.post('/wechat', async (req, res) => {
       } else if (msgType === 'image') {
 
         const imageUrl = result.xml.PicUrl?.[0];
-        if (!imageUrl) {
-          console.warn("Image sans URL.");
-          return res.status(400).send("Image invalide.");
-        }
-
-        console.log("Image reçue :", imageUrl);
 
         // Lancer OCR de manière synchrone ou asynchrone
         processWeChatImage(imageUrl, fromUser)
@@ -555,11 +530,12 @@ app.post('/wechat', async (req, res) => {
             <FromUserName><![CDATA[${toUser}]]></FromUserName>
             <CreateTime>${now}</CreateTime>
             <MsgType><![CDATA[text]]></MsgType>
-            <Content><![CDATA[Image bien reçue ! Je vais analyser son contenu.]]></Content>
+            <Content><![CDATA[I got the picture! Tell me what you want me to do with it. ]]></Content>
           </xml>`.trim();
 
         res.set('Content-Type', 'application/xml');
         return res.status(200).send(xmlResponse);
+
       } 
     } catch (e) {
       console.error("Erreur dans le traitement :", e);
