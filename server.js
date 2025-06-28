@@ -254,6 +254,10 @@ async function buildFinalPrompt(userPrompt, userId)
 
         4. Do **not include answers**. Just return the exam questions.
 
+        Below is the student's performance history (feedback only). It may be short or detailed:
+        If the student asks you to, or if you think it's relevant, you can use the student's weaknesses as the basis for the exam.
+        ${JSON.stringify(feedbackHistory, null, 2)}
+
         Here is the student's request:
         """ 
         ${userPrompt}
@@ -320,10 +324,6 @@ l'énoncer de la question a laquelle il répond.
       - Structured and easy to read
       - Constructive and friendly
       - Focused on learning, not doing the work for the student
-
-      Below is the student's performance history (feedback only). It may be short or detailed:
-      If the student asks you to, or if you think it's relevant, you can use the student's weaknesses as the basis for the exam.
-      ${JSON.stringify(feedbackHistory, null, 2)}
       
       Here is the student's message:
       """
