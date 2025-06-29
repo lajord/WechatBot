@@ -12,11 +12,17 @@ import { saveMessageToMemory } from './memoryManager.js';
 import { loadMemory } from './memoryManager.js';
 
 
+// id wx34853bb2155b4634
 
+// secret 9b2db01b3561facd8184c5a2f2736083
 
+// 9b2db01b3561facd8184c5a2f2736083
 
 const APPID = 'wx34853bb2155b4634';       
-const APPSECRET = '...';     
+const APPSECRET = '9b2db01b3561facd8184c5a2f2736083';     
+
+
+
 
 
 const app = express();
@@ -62,6 +68,59 @@ async function ApiCallDeepseek(prompt) {
 }
 
 //-------------------------------------------------------------------------------------------//
+
+
+async function getAccessToken() {
+  try {
+    const response = await axios.get('https://api.weixin.qq.com/cgi-bin/token', {
+      params: {
+        grant_type: 'client_credential',
+        appid: APPID,
+        secret: APPSECRET
+      }
+    });
+
+    if (response.data.access_token) {
+      return response.data.access_token;
+    } else {
+      console.error("Erreur récupération token :", response.data);
+      return null;
+    }
+  } catch (error) {
+    console.error("Erreur requête token :", error.message);
+    return null;
+  }
+}
+
+async function sendWeChatTextMessage(toUserOpenId, messageText) {
+  const accessToken = await getAccessToken();
+  if (!accessToken) {
+    console.error("Impossible d'envoyer le message : pas de token.");
+    return;
+  }
+
+  try {
+    const payload = {
+      touser: toUserOpenId,
+      msgtype: "text",
+      text: {
+        content: messageText
+      }
+    };
+
+    const url = `https://api.weixin.qq.com/cgi-bin/message/custom/send?access_token=${accessToken}`;
+    const response = await axios.post(url, payload);
+
+    if (response.data.errcode === 0) {
+      console.log("✅ Message envoyé via API officielle");
+    } else {
+      console.error("❌ Erreur WeChat:", response.data);
+    }
+  } catch (error) {
+    console.error("Erreur d'envoi WeChat:", error.message);
+  }
+}
+
 
 
 //-------------------------------------------------------------------------------------------//
@@ -633,7 +692,9 @@ app.post('/wechat', async (req, res) => {
           </xml>`.trim();
 
         res.set('Content-Type', 'application/xml');
-        return res.status(200).send(xmlResponse);
+        await sendWeChatTextMessage(fromUser, response);
+        return res.status(200).send('success'); // Important pour WeChat (accusé de réception)
+
 
       } else if (msgType === 'image') {
 
