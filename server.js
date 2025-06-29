@@ -96,6 +96,34 @@ async function buildFinalPrompt(userPrompt, userId)
 
   //Aller recup l'historique de l'user
   const sanitizedUserId = userId.replace(/[^a-zA-Z0-9-_]/g, "_");
+
+  // OCR context
+  let ocrContext = '';
+  try {
+    const ocrPath = path.resolve('./ocr', `${sanitizedUserId}.json`);
+    if (fs.existsSync(ocrPath)) {
+      const logs = JSON.parse(fs.readFileSync(ocrPath, 'utf8'));
+      const lastEntries = logs.slice(-3).map(entry => `- [${entry.timestamp}]\n${entry.text}`).join('\n\n');
+
+      if (lastEntries.trim()) {
+        ocrContext = `
+        The following is a short history of **screenshot content** previously sent by the student (extracted via OCR). 
+
+        Use this background if:
+        - The student **explicitly references a screenshot** in their current question.
+        - You think previous screenshots may contain **relevant context or information** that can support your response.
+
+        Always prioritize the current user question, but feel free to draw from this history to clarify, complete, or support your reply if helpful.
+
+        ${lastEntries}
+        `;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not load OCR context:', e);
+  }
+
+
   const userLogFile = path.join(LOGS_DIR, `${sanitizedUserId}.json`);
 
   if (!fs.existsSync(userLogFile)) {
@@ -160,6 +188,9 @@ async function buildFinalPrompt(userPrompt, userId)
 
 
               responds appropriately to the student
+
+              ${ocrContext}
+
               Here is the full student request:
               """
               ${userPrompt}
@@ -215,6 +246,7 @@ async function buildFinalPrompt(userPrompt, userId)
             - Bonus: ...
 
 
+            ${ocrContext}
 
             Here is the full student request:
             """
@@ -257,6 +289,8 @@ async function buildFinalPrompt(userPrompt, userId)
         Below is the student's performance history (feedback only). It may be short or detailed:
         If the student asks you to, or if you think it's relevant, you can use the student's weaknesses as the basis for the exam.
         ${JSON.stringify(feedbackHistory, null, 2)}
+
+        ${ocrContext}
 
         Here is the student's request:
         """ 
@@ -324,6 +358,9 @@ l'énoncer de la question a laquelle il répond.
       - Structured and easy to read
       - Constructive and friendly
       - Focused on learning, not doing the work for the student
+
+
+      ${ocrContext}
       
       Here is the student's message:
       """
@@ -359,6 +396,9 @@ l'énoncer de la question a laquelle il répond.
       ---
 
       Always be friendly, but stay focused on your mission.
+
+
+      ${ocrContext}
 
       Here is the user’s message:
       """
