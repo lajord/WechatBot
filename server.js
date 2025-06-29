@@ -411,16 +411,22 @@ l'énoncer de la question a laquelle il répond.
     finalPrompt = `
       ${baseContext}
 
-      The student is continuing a previous conversation. Your job is to:
-      - Interpret the current message in the context of the recent exchange.
-      - Use the conversation history below to understand what the student might be referring to.
-      - Provide a helpful follow-up, clarification, or continuation as appropriate.
-
-      ${ocrContext}
+      The student is continuing a previous exchange. Here is the recent conversation history:
 
       ${memoryContext}
 
-      Here is the student’s current message:
+      ${ocrContext}
+
+      Your task:
+      - Analyze the previous exchange and the new student message.
+      - If the student is asking to continue, clarify, or go deeper, do not repeat what was already said.
+      - Instead, **add value**:
+        - Explain the **prediction logic** in detail (e.g., how [29, 24] is classified)
+        - Explain the **intuition** behind the algorithm (e.g., how k-NN decides class)
+        - Provide edge case insights or tips
+        - If unclear, ask the student what they want to know more about
+
+      Student’s new message:
       """
       ${userPrompt}
       """
