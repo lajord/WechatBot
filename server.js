@@ -106,13 +106,13 @@ async function buildFinalPrompt(userPrompt, userId)
   if (history.length > 0) {
     const messagesFormatted = history.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
     memoryContext = `
-  Previous conversation history between the student and you:
+      Previous conversation history between the student and you:
 
-  ${messagesFormatted}
+      ${messagesFormatted}
 
-  Use this context only if the student refers to something already discussed above, or continues a previous topic.
-  Otherwise, prioritize the current question.
-    `;
+      Use this context only if the student refers to something already discussed above, or continues a previous topic.
+      Otherwise, prioritize the current question.
+        `;
   }
 
   // OCR context
@@ -156,35 +156,41 @@ async function buildFinalPrompt(userPrompt, userId)
 
   //First prompt to identify the nature of the user's request 
   const intentDetectionPrompt = `
-  Here is a user query: "${userPrompt}"
+      You are classifying user input into one or more intent categories.
 
-  Your task is to classify it by intent. You MUST choose one or more labels from this list (and only from this list):
+      Here is the user input:
+      "${userPrompt}"
 
-  - explanation_notion_ml: The user wants an explanation or definition of a machine learning concept. This includes:
-      - Direct questions like "What is overfitting?" or "Can you explain gradient descent?"
-      - Requests that suggest a desire to understand a concept or term — even if machine learning is not explicitly mentioned — should be assumed to refer to machine learning by default.
+      Choose one or more labels from the following list (and ONLY from this list):
 
-  - correction_student_input: The user provides code, a response to a question, or an attempted solution, and expects feedback, debugging, validation, or improvement. This includes:
-      - Bug reports, requests like "What’s wrong with my code?", or answers the student wants evaluated.
-      - When the domain isn't mentioned, assume it's about a machine learning exercise by default unless clearly unrelated.
+      - explanation_notion_ml: The user asks for an explanation or definition of a machine learning concept.
+      - correction_student_input: The user provides code, an answer, or a solution and expects feedback or improvement.
+      - exam_creation: The user asks for practice questions, test problems, or quiz generation.
+      - generate_study_plan: The user asks for a revision strategy or study plan.
+      - follow_up: The user is continuing a previous exchange. This includes:
+          - Short confirmations like “yes”, “continue”, “go on”
+          - Clarifications, reformulations, or questions depending on earlier content
+          - Indirect or vague messages that only make sense with context
+      - other: The user is **explicitly** talking about a topic unrelated to machine learning (e.g., movies, politics, food, etc.).
 
-  - exam_creation: The user asks you to generate exercises, quizzes, or practice questions — even indirectly (e.g., "Can you test me on X?").
-      - If they ask for questions, tests, or challenges, assume it's for machine learning unless another subject is clearly stated.
+      Strict classification rules:
 
-  - generate_study_plan: The user requests a study guide, personalized revision advice, or preparation strategy for exams or learning.
-      - Any mention of "plan", "what should I revise?", "how to study", etc., should be interpreted as a study plan request in ML unless stated otherwise.
+      - Only use "other" if the topic is **clearly and explicitly** not about machine learning.
+      - Do NOT assume something is unrelated based on lack of keywords.
+      - If ambiguous, short, or unclear: assume it's **related to ML** by default, and classify it as "follow_up".
+      - Prefer domain-specific categories unless you are certain the topic is off-topic.
+      - Assume the user is here for machine learning help, unless they obviously say otherwise.
 
-  - other: The query is not related to machine learning, or is clearly off-topic (e.g., math, general coding, greetings, personal questions, casual talk, etc.).
+      Examples:
 
-  Rules:
-  - If the query is clearly not about machine learning, the ONLY valid response is: other.
-  - Never combine other with any other label.
-  - Do NOT reinterpret math, statistics, or general programming as ML unless clearly tied to ML concepts.
-  - If the query is ambiguous but matches the form of a valid label, assume the topic is machine learning by default.
-  - In other words: prefer ML categories over "other" unless it is explicitly off-topic.
-    
-  Return only the labels, comma-separated (e.g., explanation_notion_ml, correction_student_input). No extra words.
-  `;
+      "What's a decision tree?" → explanation_notion_ml  
+      "Can you fix my code?" → correction_student_input  
+      "Can you quiz me on CNNs?" → exam_creation  
+      "Yes, go on" → follow_up  
+      "Can you help me cook pasta?" → other  
+
+      Return only the labels, comma-separated. No commentary.
+      `;
 
   
   let intent;
@@ -216,6 +222,8 @@ async function buildFinalPrompt(userPrompt, userId)
               responds appropriately to the student
 
               ${ocrContext}
+
+              ${memoryContext}
 
               Here is the full student request:
               """
@@ -274,6 +282,8 @@ async function buildFinalPrompt(userPrompt, userId)
 
             ${ocrContext}
 
+            ${memoryContext}
+
             Here is the full student request:
             """
             ${userPrompt}
@@ -317,6 +327,8 @@ async function buildFinalPrompt(userPrompt, userId)
         ${JSON.stringify(feedbackHistory, null, 2)}
 
         ${ocrContext}
+
+        ${memoryContext}
 
         Here is the student's request:
         """ 
@@ -387,11 +399,33 @@ l'énoncer de la question a laquelle il répond.
 
 
       ${ocrContext}
+
+      ${memoryContext}
       
       Here is the student's message:
       """
       ${userPrompt}
       """`;
+  }
+  else if (lowerIntent.includes("follow_up")) {
+    finalPrompt = `
+      ${baseContext}
+
+      The student is continuing a previous conversation. Your job is to:
+      - Interpret the current message in the context of the recent exchange.
+      - Use the conversation history below to understand what the student might be referring to.
+      - Provide a helpful follow-up, clarification, or continuation as appropriate.
+
+      ${ocrContext}
+
+      ${memoryContext}
+
+      Here is the student’s current message:
+      """
+      ${userPrompt}
+      """
+    `;
+  
   }else if (lowerIntent.includes("other")) {
     finalPrompt = `
       ${baseContext}
@@ -425,6 +459,8 @@ l'énoncer de la question a laquelle il répond.
 
 
       ${ocrContext}
+
+      ${memoryContext}
 
       Here is the user’s message:
       """
