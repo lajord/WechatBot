@@ -138,28 +138,36 @@ async function buildFinalPrompt(userPrompt, userId)
 
   //First prompt to identify the nature of the user's request 
   const intentDetectionPrompt = `
-      Here is a user query: "${userPrompt}"
+  Here is a user query: "${userPrompt}"
 
-      Your task is to classify it by intent. You MUST choose one or more labels from this list (and only from this list):
+  Your task is to classify it by intent. You MUST choose one or more labels from this list (and only from this list):
 
-      - explanation_notion_ml: The user wants an explanation or definition of a machine learning concept (e.g., "What is overfitting?", "Can you explain gradient descent?").
+  - explanation_notion_ml: The user wants an explanation or definition of a machine learning concept. This includes:
+      - Direct questions like "What is overfitting?" or "Can you explain gradient descent?"
+      - Requests that suggest a desire to understand a concept or term — even if machine learning is not explicitly mentioned — should be assumed to refer to machine learning by default.
 
-      - correction_student_input: The user submits code, an answer, or a solution and expects feedback, debugging, or correction.
+  - correction_student_input: The user provides code, a response to a question, or an attempted solution, and expects feedback, debugging, validation, or improvement. This includes:
+      - Bug reports, requests like "What’s wrong with my code?", or answers the student wants evaluated.
+      - When the domain isn't mentioned, assume it's about a machine learning exercise by default unless clearly unrelated.
 
-      - exam_creation: The user asks to generate exercises, tests, or exam-style questions related to machine learning.
+  - exam_creation: The user asks you to generate exercises, quizzes, or practice questions — even indirectly (e.g., "Can you test me on X?").
+      - If they ask for questions, tests, or challenges, assume it's for machine learning unless another subject is clearly stated.
 
-      - generate_study_plan: The user wants help organizing their ML study or revision (e.g., "Can you build me a study plan?").
+  - generate_study_plan: The user requests a study guide, personalized revision advice, or preparation strategy for exams or learning.
+      - Any mention of "plan", "what should I revise?", "how to study", etc., should be interpreted as a study plan request in ML unless stated otherwise.
 
-      - other: The query is not about machine learning or doesn't fit any of the above (e.g., math, general programming, casual message).
+  - other: The query is not related to machine learning, or is clearly off-topic (e.g., math, general coding, greetings, personal questions, casual talk, etc.).
 
-      Important rules:
-      - If the query is not related to machine learning, the ONLY valid response is: other.
-      - Never combine other with another label.
-      - Do NOT interpret math, stats, or general programming as ML unless clearly connected.
-
-      Return only the labels, comma-separated (e.g., explanation_notion_ml, correction_student_input). No extra words.
-
+  Rules:
+  - If the query is clearly not about machine learning, the ONLY valid response is: other.
+  - Never combine other with any other label.
+  - Do NOT reinterpret math, statistics, or general programming as ML unless clearly tied to ML concepts.
+  - If the query is ambiguous but matches the form of a valid label, assume the topic is machine learning by default.
+  - In other words: prefer ML categories over "other" unless it is explicitly off-topic.
+    
+  Return only the labels, comma-separated (e.g., explanation_notion_ml, correction_student_input). No extra words.
   `;
+
   
   let intent;
   try {
