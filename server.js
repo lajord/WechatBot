@@ -8,6 +8,8 @@ import { createHash } from 'crypto';
 // import { pipeline } from '@xenova/transformers';
 import axios from 'axios';
 import { processWeChatImage } from './handleImages.js';
+import { saveMessageToMemory } from './memoryManager.js';
+import { loadMemory } from './memoryManager.js';
 
 
 
@@ -96,6 +98,22 @@ async function buildFinalPrompt(userPrompt, userId)
 
   //Aller recup l'historique de l'user
   const sanitizedUserId = userId.replace(/[^a-zA-Z0-9-_]/g, "_");
+
+  // Charger les derniers messages
+  const history = loadMemory(userId);
+  let memoryContext = '';
+
+  if (history.length > 0) {
+    const messagesFormatted = history.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
+    memoryContext = `
+  Previous conversation history between the student and you:
+
+  ${messagesFormatted}
+
+  Use this context only if the student refers to something already discussed above, or continues a previous topic.
+  Otherwise, prioritize the current question.
+    `;
+  }
 
   // OCR context
   let ocrContext = '';
@@ -560,6 +578,8 @@ app.post('/wechat', async (req, res) => {
         const { finalPrompt, intent } = await buildFinalPrompt(userPrompt, fromUser);
         const response = await ApiCallDeepseek(finalPrompt);
         await logInteraction(fromUser, userPrompt, response, intent);
+        saveMessageToMemory(fromUser, "user", userPrompt);
+        saveMessageToMemory(fromUser, "assistant", response);
         console.log("Réponse Deepseek :", response);
         const xmlResponse = `
           <xml>
