@@ -656,10 +656,13 @@ app.post('/wechat', async (req, res) => {
   const rawXml = req.body;
   console.log(" Requête XML brute reçue de WeChat :\n", rawXml);
 
+  // On répond tout de suite à WeChat
+  res.status(200).send('Message received. Processing in progress...');
+
   xml2js.parseString(rawXml, async (err, result) => {
     if (err) {
       console.error("Erreur de parsing XML :", err);
-      return res.status(400).send("Format XML invalide.");
+      return;
     }
 
     try {
@@ -670,7 +673,7 @@ app.post('/wechat', async (req, res) => {
 
       if (!msgType || !fromUser || !toUser) {
         console.warn("Données XML incomplètes.");
-        return res.status(400).send("Requête invalide.");
+        return;
       }
 
       if (msgType === 'text') {
@@ -682,25 +685,12 @@ app.post('/wechat', async (req, res) => {
         saveMessageToMemory(fromUser, "user", userPrompt);
         saveMessageToMemory(fromUser, "assistant", response);
         console.log("Réponse Deepseek :", response);
-        const xmlResponse = `
-          <xml>
-            <ToUserName><![CDATA[${fromUser}]]></ToUserName>
-            <FromUserName><![CDATA[${toUser}]]></FromUserName>
-            <CreateTime>${now}</CreateTime>
-            <MsgType><![CDATA[text]]></MsgType>
-            <Content><![CDATA[${response.trim()}]]></Content>
-          </xml>`.trim();
 
-        res.set('Content-Type', 'application/xml');
-        await sendWeChatTextMessage(fromUser, response);
-        return res.status(200).send('success'); // Important pour WeChat (accusé de réception)
+        await sendWeChatTextMessage(fromUser, response); // Envoi réel du message à l'utilisateur
+      }
 
-
-      } else if (msgType === 'image') {
-
+      else if (msgType === 'image') {
         const imageUrl = result.xml.PicUrl?.[0];
-
-        // Lancer OCR de manière synchrone ou asynchrone
         processWeChatImage(imageUrl, fromUser)
           .then(text => {
             if (text) {
@@ -708,25 +698,15 @@ app.post('/wechat', async (req, res) => {
             }
           });
 
-        const xmlResponse = `
-          <xml>
-            <ToUserName><![CDATA[${fromUser}]]></ToUserName>
-            <FromUserName><![CDATA[${toUser}]]></FromUserName>
-            <CreateTime>${now}</CreateTime>
-            <MsgType><![CDATA[text]]></MsgType>
-            <Content><![CDATA[I got the picture! Tell me what you want me to do with it. ]]></Content>
-          </xml>`.trim();
+        await sendWeChatTextMessage(fromUser, "I got the picture! Tell me what you want me to do with it.");
+      }
 
-        res.set('Content-Type', 'application/xml');
-        return res.status(200).send(xmlResponse);
-
-      } 
     } catch (e) {
       console.error("Erreur dans le traitement :", e);
-      return res.status(500).send("Erreur serveur.");
     }
   });
 });
+
 
 
 
