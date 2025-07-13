@@ -651,17 +651,14 @@ async function logInteraction(userId, userPrompt, aiResponse, intent) {
 
 // This is the route to send POST requests, these are XLMs because wechat sends XLMs.
 
-
 app.post('/wechat', async (req, res) => {
   const rawXml = req.body;
   console.log(" Requête XML brute reçue de WeChat :\n", rawXml);
 
-  // On répond tout de suite à WeChat
-  res.status(200).send('Message received. Processing in progress...');
-
   xml2js.parseString(rawXml, async (err, result) => {
     if (err) {
       console.error("Erreur de parsing XML :", err);
+      res.status(200).send('');  // fail-safe response
       return;
     }
 
@@ -673,8 +670,22 @@ app.post('/wechat', async (req, res) => {
 
       if (!msgType || !fromUser || !toUser) {
         console.warn("Données XML incomplètes.");
+        res.status(200).send('');
         return;
       }
+
+      const xmlReply = `
+        <xml>
+          <ToUserName><![CDATA[${fromUser}]]></ToUserName>
+          <FromUserName><![CDATA[${toUser}]]></FromUserName>
+          <CreateTime>${now}</CreateTime>
+          <MsgType><![CDATA[text]]></MsgType>
+          <Content><![CDATA[Merci pour votre message. Je prépare une réponse...]]></Content>
+        </xml>
+      `;
+      res.set('Content-Type', 'application/xml');
+      res.status(200).send(xmlReply);
+
 
       if (msgType === 'text') {
         const userPrompt = result.xml.Content?.[0];
@@ -686,7 +697,7 @@ app.post('/wechat', async (req, res) => {
         saveMessageToMemory(fromUser, "assistant", response);
         console.log("Réponse Deepseek :", response);
 
-        await sendWeChatTextMessage(fromUser, response); // Envoi réel du message à l'utilisateur
+        await sendWeChatTextMessage(fromUser, response);
       }
 
       else if (msgType === 'image') {
@@ -703,9 +714,11 @@ app.post('/wechat', async (req, res) => {
 
     } catch (e) {
       console.error("Erreur dans le traitement :", e);
+      res.status(200).send('');
     }
   });
 });
+
 
 
 
