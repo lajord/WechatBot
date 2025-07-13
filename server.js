@@ -467,81 +467,39 @@ l'énoncer de la question a laquelle il répond.
       """`;
   }
   else if (lowerIntent.includes("follow_up")) {
-    finalPrompt = `
+      finalPrompt = `
       ${baseContext}
 
-      The student just sent a follow-up message. Your task is to understand if they are:
-      - continuing a technical exchange
-      - OR just saying something polite like "hello", "thanks", etc.
+      The student just sent a follow-up message. You must decide what kind of message it is.
 
-      If the message is just a greeting, thanks, or social/polite message (e.g. "hi", "good morning", "thank you", "what's up?"):
-      - Do NOT overanalyze.
-      - Simply respond politely and redirect them toward learning ML.
-      - Example: "Hi! I'm here to help you study machine learning. What would you like to work on today?"
+      CASE 1 — The message is just a social/polite message (e.g. "hello", "hi", "thanks", "good morning", "bye", etc.):
+      - Do NOT analyze the conversation history.
+      - Just respond politely and helpfully, as a friendly machine learning assistant.
+      - Example: 
+        - "Hi there! I'm your ML assistant — ready when you are. What do you want to work on today?"
+        - "You're welcome! Let me know if you'd like help with any ML topic."
 
-      If the message continues a previous technical conversation:
-      - Analyze the conversation history below
-      - Do NOT repeat what has already been said
+      CASE 2 — The message is a technical follow-up:
+      - Use the conversation history below to understand context.
+      - Do NOT repeat previous explanations.
       - Add value:
-        - Clarify the student’s confusion
-        - Explain the intuition or logic behind a method
-        - Offer examples, edge cases, or new angles
-        - Ask for clarification if their request is unclear
+        - Clarify confusion
+        - Give intuition or deeper explanation
+        - Provide advanced examples, edge cases, or next steps
+        - Ask a clarifying question if the student’s message is vague
 
-      Previous conversation history:
+      --- Conversation History ---
       ${memoryContext}
 
-      OCR content (screenshots from the student):
+      --- Screenshot Context (OCR) ---
       ${ocrContext}
 
-      New student message:
+      --- Student’s New Message ---
       """
       ${userPrompt}
       """
     `;
 
-  
-  }else if (lowerIntent.includes("other")) {
-    finalPrompt = `
-      ${baseContext}
-
-      You are a helpful and polite AI assistant specialized in **machine learning**.
-
-      Your behavior depends on the user’s intent:
-
-      ---
-
-      **Case 1 — Casual or polite message (e.g., greetings, small talk, thank you):**
-      - Reply in a friendly and welcoming tone.
-      - Acknowledge the user's message (e.g., "Hello!", "Nice to see you!" or "You're welcome!").
-      - Gently guide the user toward your actual purpose: helping with machine learning.
-      - Example: "Hi there! I'm your machine learning assistant. What would you like to study today?"
-
-      ---
-
-      **Case 2 — User asks something that is NOT related to machine learning:**
-      - Do **not** try to answer the question.
-      - Kindly explain that you are focused solely on helping with machine learning topics.
-      - Clearly list the four types of things you can help with:
-        1. Explaining ML concepts
-        2. Reviewing student answers or code
-        3. Generating ML exam questions
-        4. Building personalized study plans
-
-      ---
-
-      Always be friendly, but stay focused on your mission.
-
-
-      ${ocrContext}
-
-      ${memoryContext}
-
-      Here is the user’s message:
-      """
-      ${userPrompt}
-      """
-      `;
   }
   return {finalPrompt, intent};
 }
