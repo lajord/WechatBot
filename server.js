@@ -470,26 +470,36 @@ l'énoncer de la question a laquelle il répond.
     finalPrompt = `
       ${baseContext}
 
-      The student is continuing a previous exchange. Here is the recent conversation history:
+      The student just sent a follow-up message. Your task is to understand if they are:
+      - continuing a technical exchange
+      - OR just saying something polite like "hello", "thanks", etc.
 
+      If the message is just a greeting, thanks, or social/polite message (e.g. "hi", "good morning", "thank you", "what's up?"):
+      - Do NOT overanalyze.
+      - Simply respond politely and redirect them toward learning ML.
+      - Example: "Hi! I'm here to help you study machine learning. What would you like to work on today?"
+
+      If the message continues a previous technical conversation:
+      - Analyze the conversation history below
+      - Do NOT repeat what has already been said
+      - Add value:
+        - Clarify the student’s confusion
+        - Explain the intuition or logic behind a method
+        - Offer examples, edge cases, or new angles
+        - Ask for clarification if their request is unclear
+
+      Previous conversation history:
       ${memoryContext}
 
+      OCR content (screenshots from the student):
       ${ocrContext}
 
-      Your task:
-      - Analyze the previous exchange and the new student message.
-      - If the student is asking to continue, clarify, or go deeper, do not repeat what was already said.
-      - Instead, **add value**:
-        - Explain the **prediction logic** in detail (e.g., how [29, 24] is classified)
-        - Explain the **intuition** behind the algorithm (e.g., how k-NN decides class)
-        - Provide edge case insights or tips
-        - If unclear, ask the student what they want to know more about
-
-      Student’s new message:
+      New student message:
       """
       ${userPrompt}
       """
     `;
+
   
   }else if (lowerIntent.includes("other")) {
     finalPrompt = `
@@ -680,7 +690,7 @@ app.post('/wechat', async (req, res) => {
           <FromUserName><![CDATA[${toUser}]]></FromUserName>
           <CreateTime>${now}</CreateTime>
           <MsgType><![CDATA[text]]></MsgType>
-          <Content><![CDATA[Merci pour votre message. Je prépare une réponse...]]></Content>
+          <Content><![CDATA[Thanks for you message. I'm preparing an answer...]]></Content>
         </xml>
       `;
       res.set('Content-Type', 'application/xml');
