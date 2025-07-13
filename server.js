@@ -667,7 +667,7 @@ app.post('/wechat', async (req, res) => {
         await logInteraction(fromUser, userPrompt, response, intent);
         saveMessageToMemory(fromUser, "user", userPrompt);
         saveMessageToMemory(fromUser, "assistant", response);
-        console.log("Réponse Deepseek :", response);
+        console.log("Réponse Deepseek : \n\n -------------------- \n\n ", response);
 
         await sendWeChatTextMessage(fromUser, response);
       }
