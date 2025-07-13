@@ -467,38 +467,42 @@ l'énoncer de la question a laquelle il répond.
       """`;
   }
   else if (lowerIntent.includes("follow_up")) {
-      finalPrompt = `
-      ${baseContext}
+    finalPrompt = `
+    ${baseContext}
 
-      The student just sent a follow-up message. You must decide what kind of message it is.
+    The student just sent a new message. Your job is to determine how to reply.
 
-      CASE 1 — The message is just a social/polite message (e.g. "hello", "hi", "thanks", "good morning", "bye", etc.):
-      - Do NOT analyze the conversation history.
-      - Just respond politely and helpfully, as a friendly machine learning assistant.
-      - Example: 
-        - "Hi there! I'm your ML assistant — ready when you are. What do you want to work on today?"
-        - "You're welcome! Let me know if you'd like help with any ML topic."
+    You must choose ONE of the following response modes:
 
-      CASE 2 — The message is a technical follow-up:
-      - Use the conversation history below to understand context.
-      - Do NOT repeat previous explanations.
-      - Add value:
-        - Clarify confusion
-        - Give intuition or deeper explanation
-        - Provide advanced examples, edge cases, or next steps
-        - Ask a clarifying question if the student’s message is vague
+    ---
+    CASE 1 — Polite / social message only (e.g., "hello", "hi", "thanks", "goodbye", "how are you?"):
+    - Do NOT mention any previous conversation or context.
+    - Do NOT include any ML content.
+    - Just reply in a short, polite way to greet or acknowledge the student.
+    - Gently guide the student toward asking a machine learning question.
+    - Examples:
+      - "Hi there! I'm here to help you study machine learning. What would you like to work on today?"
+      - "You're welcome! Let me know if you'd like to review a concept or solve an exercise together."
 
-      --- Conversation History ---
-      ${memoryContext}
+    ---
+    CASE 2 — Technical follow-up:
+    - Use the memory and context provided below.
+    - Do NOT repeat past answers.
+    - Instead, continue the explanation, offer clarification, or go deeper.
+    - Provide insight or ask a clarifying question if needed.
 
-      --- Screenshot Context (OCR) ---
-      ${ocrContext}
+    --- Conversation History ---
+    ${memoryContext}
 
-      --- Student’s New Message ---
-      """
-      ${userPrompt}
-      """
-    `;
+    --- Screenshot Context (OCR) ---
+    ${ocrContext}
+
+    --- Student’s Message ---
+    """
+    ${userPrompt}
+    """
+  `;
+
 
   }
   return {finalPrompt, intent};
