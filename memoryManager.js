@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
+// secret 9b2db01b3561facd8184c5a2f2736083
+
 const MEMORY_DIR = './memory';
 if (!fs.existsSync(MEMORY_DIR)) {
   fs.mkdirSync(MEMORY_DIR);
