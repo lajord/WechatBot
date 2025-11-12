@@ -1,10 +1,11 @@
-import express from 'express';  // using the express framework for my backend  
+import express from 'express';  // using the express framework for my backend
 import bodyParser from 'body-parser'; // To help express understand HTTP requests
 import xml2js from 'xml2js'; // To manage XLM requests
 import OpenAI from "openai"; // for use deepseek
 import fs from 'fs';
 import path from 'path';
 import { createHash } from 'crypto';
+import 'dotenv/config'; // Load environment variables
 // import { pipeline } from '@xenova/transformers';
 import axios from 'axios';
 import { processWeChatImage } from './handleImages.js';
@@ -12,21 +13,16 @@ import { saveMessageToMemory } from './memoryManager.js';
 import { loadMemory } from './memoryManager.js';
 
 
-// id wx34853bb2155b4634
-
-// secret 9b2db01b3561facd8184c5a2f2736083
-
-// 9b2db01b3561facd8184c5a2f2736083
-
-const APPID = 'wx34853bb2155b4634';       
-const APPSECRET = '9b2db01b3561facd8184c5a2f2736083';     
+// Load environment variables
+const APPID = process.env.WECHAT_APPID;
+const APPSECRET = process.env.WECHAT_APPSECRET;     
 
 
 
 
 
 const app = express();
-const PORT = 80;
+const PORT = process.env.PORT || 80;
 
 const LOG_FILE = './logs.json';
 
@@ -43,8 +39,8 @@ app.use(bodyParser.text({ type: '*/*' })); //this line indicates that the inputs
 
 //API connection
 const openai = new OpenAI({
-  baseURL: 'https://api.deepseek.com',
-  apiKey: 'sk-7e8eab473f97484c97dd0be91cb192f0'
+  baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+  apiKey: process.env.DEEPSEEK_API_KEY
 });
 
 //-------------------------------------------------------------------------------------------//
